@@ -1,0 +1,152 @@
+import { useState, useEffect } from 'react';
+import AppointmentCreator from './AppointmentCreator';
+import AppointmentBatchCreator from './AppointmentBatchCreator';
+import AppointmentViewer from './AppointmentViewer';
+import AppointmentEditor from './AppointmentEditor';
+import AppointmentCalendar from './AppointmentCalendar';
+import { fetchVolunteers, fetchStudies } from '../api/dataService';
+
+const AppointmentManager = () => {
+  const [view, setView] = useState('calendar'); // 'calendar', 'create', 'createBatch', 'view', 'edit'
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [selectedStudy, setSelectedStudy] = useState(null);
+  const [selectedVolunteer, setSelectedVolunteer] = useState(null);
+  const [volunteers, setVolunteers] = useState([]);
+  const [studies, setStudies] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        setIsLoading(true);
+        const [volunteersData, studiesData] = await Promise.all([
+          fetchVolunteers(),
+          fetchStudies()
+        ]);
+        setVolunteers(volunteersData);
+        setStudies(studiesData);
+        setError(null);
+      } catch (err) {
+        setError('Erreur lors du chargement des données: ' + err.message);
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+  const handleAppointmentClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    setView('view');
+  };
+
+  const handleStudySelect = (study) => {
+    setSelectedStudy(study);
+  };
+
+  const handleVolunteerSelect = (volunteer) => {
+    setSelectedVolunteer(volunteer);
+  };
+
+  const handleCreateClick = () => {
+    setSelectedAppointment(null);
+    setView('create');
+  };
+
+  const handleCreateBatchClick = () => {
+    setSelectedAppointment(null);
+    setView('createBatch');
+  };
+
+  const handleEditClick = (appointment) => {
+    setSelectedAppointment(appointment);
+    setView('edit');
+  };
+
+  const handleBackClick = () => {
+    setView('calendar');
+    setSelectedAppointment(null);
+  };
+
+  if (isLoading) {
+    return <div className="p-4 text-center">Chargement des données...</div>;
+  }
+
+  if (error) {
+    return <div className="p-4 text-center text-red-600">{error}</div>;
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <div className="mb-6 flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-800">Gestion des Rendez-vous</h1>
+        <div className="flex space-x-2">
+          <button 
+            onClick={() => setView('calendar')} 
+            className={`px-4 py-2 rounded ${view === 'calendar' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          >
+            Calendrier
+          </button>
+          <button 
+            onClick={handleCreateClick} 
+            className={`px-4 py-2 rounded ${view === 'create' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          >
+            Créer un RDV
+          </button>
+          <button 
+            onClick={handleCreateBatchClick} 
+            className={`px-4 py-2 rounded ${view === 'createBatch' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          >
+            Créer plusieurs RDV
+          </button>
+        </div>
+      </div>
+
+      {view === 'calendar' && (
+        <AppointmentCalendar onAppointmentClick={handleAppointmentClick} />
+      )}
+
+      {view === 'create' && (
+        <AppointmentCreator 
+          volunteers={volunteers}
+          studies={studies}
+          selectedVolunteer={selectedVolunteer}
+          selectedStudy={selectedStudy}
+          onVolunteerSelect={handleVolunteerSelect}
+          onStudySelect={handleStudySelect}
+          onBack={handleBackClick}
+        />
+      )}
+
+      {view === 'createBatch' && (
+        <AppointmentBatchCreator 
+          studies={studies}
+          selectedStudy={selectedStudy}
+          onStudySelect={handleStudySelect}
+          onBack={handleBackClick}
+        />
+      )}
+
+      {view === 'view' && selectedAppointment && (
+        <AppointmentViewer 
+          appointment={selectedAppointment}
+          onEdit={() => handleEditClick(selectedAppointment)}
+          onBack={handleBackClick}
+        />
+      )}
+
+      {view === 'edit' && selectedAppointment && (
+        <AppointmentEditor 
+          appointment={selectedAppointment}
+          volunteers={volunteers}
+          onBack={handleBackClick}
+        />
+      )}
+    </div>
+  );
+};
+
+export default AppointmentManager;
