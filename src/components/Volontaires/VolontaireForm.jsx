@@ -19,6 +19,7 @@ const FormTabs = ({ activeTab, setActiveTab }) => {
     { id: "mesures", label: "Mesures" }, // Nouvel onglet
     { id: "notes", label: "Notes" },
     { id: "RIB", label: "RIB" }, // Nouvel onglet
+    { id: "evaluation", label: "Évaluation" }, // Nouvel onglet
   ];
 
   return (
@@ -80,7 +81,7 @@ const VolontaireForm = () => {
     origineMere: "",
 
     // Peau
-    typePeau: "",
+    typePeauVisage: "",
     carnation: "",
     sensibiliteCutanee: "",
     teintInhomogene: "Non",
@@ -214,6 +215,10 @@ const VolontaireForm = () => {
     // Informations Bancaires
     iban: "",
     bic: "",
+
+    // Champs pour les évaluations
+    evaluation: 0,
+
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -293,7 +298,7 @@ const VolontaireForm = () => {
           origineMere: detailsData.origineMere || "",
 
           // Peau
-          typePeau: detailsData.typePeauVisage || "",
+          typePeauVisage: detailsData.typePeauVisage || "",
           carnation: detailsData.carnation || "",
           sensibiliteCutanee: detailsData.sensibiliteCutanee || "",
           teintInhomogene: detailsData.teintInhomogene || "Non",
@@ -336,7 +341,7 @@ const VolontaireForm = () => {
 
           // Notes
           notes: detailsData.commentairesVol || "",
-
+          evaluation: detailsData.notes || 0,
           // Caractéristiques supplémentaires
           cicatrices: detailsData.cicatrices || "Non",
           tatouages: detailsData.tatouages || "Non",
@@ -515,8 +520,8 @@ const VolontaireForm = () => {
       newErrors.sexe = "Le sexe est obligatoire";
     }
 
-    if (!formData.typePeau) {
-      newErrors.typePeau = "Le type de peau est obligatoire";
+    if (!formData.typePeauVisage) {
+      newErrors.typePeauVisage = "Le type de peau est obligatoire";
     }
 
     // Code postal français (5 chiffres)
@@ -594,7 +599,7 @@ const VolontaireForm = () => {
         telDomicileVol: defaultIfNull(formData.telephoneDomicile, ""),
         sexe: defaultIfNull(formData.sexe, ""),
         dateNaissance: defaultIfNull(formData.dateNaissance, ""),
-        typePeauVisage: defaultIfNull(formData.typePeau, ""),
+        typePeauVisage: defaultIfNull(formData.typePeauVisage, ""),
         phototype: defaultIfNull(formData.phototype, ""),
         ethnie: defaultIfNull(formData.ethnie, ""),
         santeCompatible: defaultIfNull(formData.santeCompatible, "Oui"),
@@ -675,6 +680,9 @@ const VolontaireForm = () => {
 
         // Notes
         commentairesVol: defaultIfNull(formData.notes, ""),
+
+        //Evaluations
+        notes: defaultIfNull(formData.evaluation, ""),
 
         //Caractéristiques supplémentaires
         cicatrices: defaultIfNull(formData.cicatrices, "Non"),
@@ -771,7 +779,7 @@ const VolontaireForm = () => {
 
       // Création ou mise à jour du volontaire avec toutes les données en une seule fois
       if (isEditMode) {
-        await volontaireService.update(id, volontaireCompleteData);
+        await volontaireService.updateDetails(id, volontaireCompleteData);
         setFormSuccess("Volontaire mis à jour avec succès");
       } else {
         // Création d'un nouveau volontaire
@@ -1272,22 +1280,21 @@ const VolontaireForm = () => {
                 </label>
                 <select
                   id="typePeau"
-                  name="typePeau"
-                  value={formData.typePeau}
+                  name="typePeauVisage"
+                  value={formData.typePeauVisage || ""}
                   onChange={handleChange}
-                  className={`form-select block w-full ${errors.typePeau ? "border-red-500" : ""
-                    }`}
+                  className={`form-select block w-full ${errors.typePeauVisage ? "border-red-500" : ""}`}
                   required
                 >
                   <option value="">Sélectionner</option>
-                  <option value="NORMALE">Normale</option>
-                  <option value="SECHE">Sèche</option>
-                  <option value="GRASSE">Grasse</option>
-                  <option value="MIXTE">Mixte</option>
-                  <option value="SENSIBLE">Sensible</option>
+                  <option value="Normale">Normale</option>
+                  <option value="Sèche">Sèche</option>
+                  <option value="Grasse">Grasse</option>
+                  <option value="Mixte">Mixte</option>
+                  <option value="Sensible">Sensible</option>
                 </select>
-                {errors.typePeau && (
-                  <p className="mt-1 text-sm text-red-500">{errors.typePeau}</p>
+                {errors.typePeauVisage && (
+                  <p className="mt-1 text-sm text-red-500">{errors.typePeauVisage}</p>
                 )}
               </div>
 
@@ -3134,6 +3141,81 @@ const VolontaireForm = () => {
                 <p className="text-xs text-gray-500 mt-1">
                   {infoBancaireService.getHelpMessages().bic.where}
                 </p>
+              </div>
+            </div>
+          </div>
+        )
+
+      case "evaluation":
+        return (
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              Évaluation du volontaire
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Évaluation par étoiles
+                </label>
+
+                {/* Système d'étoiles */}
+                <div className="flex items-center space-x-1 mb-2">
+                  {[1, 2, 3].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => handleChange({
+                        target: {
+                          name: 'evaluation',
+                          value: star === parseInt(formData.evaluation) ? 0 : star
+                        }
+                      })}
+                      className="focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded-sm transition-all duration-150 hover:scale-110"
+                      aria-label={`${star} étoile${star > 1 ? 's' : ''}`}
+                    >
+                      <svg
+                        className={`w-8 h-8 transition-colors duration-200 ${star <= parseInt(formData.evaluation || 0)
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300 hover:text-yellow-200'
+                          }`}
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </button>
+                  ))}
+
+                  <span className="ml-3 text-sm text-gray-600">
+                    {parseInt(formData.evaluation || 0)}/3
+                  </span>
+                </div>
+
+                {/* Bouton pour réinitialiser */}
+                <button
+                  type="button"
+                  onClick={() => handleChange({
+                    target: {
+                      name: 'evaluation',
+                      value: 0
+                    }
+                  })}
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                >
+                  Réinitialiser l'évaluation
+                </button>
+
+                {errors.evaluation && (
+                  <p className="mt-1 text-sm text-red-500">{errors.evaluation}</p>
+                )}
+
+                {/* Affichage pour debug */}
+                <div className="mt-4 p-3 bg-gray-50 rounded border">
+                  <p className="text-sm text-gray-600">
+                    <strong>Valeur actuelle :</strong> {parseInt(formData.evaluation || 0)} étoile{parseInt(formData.evaluation || 0) > 1 ? 's' : ''}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -7,16 +7,84 @@ import rdvService from './rdvService';
 const ETUDES_ENDPOINT = '/etudes';
 
 const etudeService = {
-  // Récupérer toutes les études
-  getAll: async (params = {}) => {
-    const response = await api.get(ETUDES_ENDPOINT, { params });
-    return response.data;
+
+  getById: async (id) => {
+    try {
+      const response = await api.get(`/etudes/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération de l'étude ${id}:`, error);
+      throw error;
+    }
   },
 
-  // Récupérer une étude par son ID
-  getById: async (id) => {
-    const response = await api.get(`${ETUDES_ENDPOINT}/${id}`);
-    return response.data;
+  // Récupérer toutes les études
+  getAll: async (params = {}) => {
+    try {
+      const response = await api.get('/etudes', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des études:', error);
+      throw error;
+    }
+  },
+
+  // Récupérer avec pagination
+  getPaginated: async (page = 0, size = 10, sortBy = 'dateDebut', direction = 'DESC') => {
+    try {
+      const response = await api.get('/etudes/paginated', {
+        params: { page, size, sortBy, direction }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération paginée des études:', error);
+      throw error;
+    }
+  },
+
+  // Rechercher des études
+  search: async (searchTerm) => {
+    try {
+      const response = await api.get('/etudes/search', {
+        params: { searchTerm }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la recherche d\'études:', error);
+      throw error;
+    }
+  },
+
+  // Créer une nouvelle étude
+  create: async (etudeData) => {
+    try {
+      const response = await api.post('/etudes', etudeData);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la création de l\'étude:', error);
+      throw error;
+    }
+  },
+
+  // Mettre à jour une étude
+  update: async (id, etudeData) => {
+    try {
+      const response = await api.put(`/etudes/${id}`, etudeData);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour de l'étude ${id}:`, error);
+      throw error;
+    }
+  },
+
+  // Supprimer une étude
+  delete: async (id) => {
+    try {
+      await api.delete(`/etudes/${id}`);
+    } catch (error) {
+      console.error(`Erreur lors de la suppression de l'étude ${id}:`, error);
+      throw error;
+    }
   },
 
   // Récupérer une étude par sa référence
@@ -25,13 +93,6 @@ const etudeService = {
     return response.data;
   },
 
-  // Rechercher des études
-  search: async (searchTerm) => {
-    const response = await api.get(`${ETUDES_ENDPOINT}/search`, {
-      params: { searchTerm }
-    });
-    return response.data;
-  },
 
   // Récupérer les études par type
   getByType: async (type) => {
@@ -91,22 +152,7 @@ const etudeService = {
     return response.data;
   },
 
-  // Créer une nouvelle étude
-  create: async (etudeData) => {
-    const response = await api.post(ETUDES_ENDPOINT, etudeData);
-    return response.data;
-  },
 
-  // Mettre à jour une étude existante
-  update: async (id, etudeData) => {
-    const response = await api.put(`${ETUDES_ENDPOINT}/${id}`, etudeData);
-    return response.data;
-  },
-
-  // Supprimer une étude
-  delete: async (id) => {
-    return api.delete(`${ETUDES_ENDPOINT}/${id}`);
-  },
 
   // Suggestions d'études (utilisant Meilisearch)
   suggest: async (query, limit = 10) => {
@@ -141,28 +187,6 @@ const etudeService = {
       return await Promise.all(promises);
     } catch (error) {
       console.error('Erreur lors du chargement des études avec RDV count:', error);
-      throw error;
-    }
-  },
-
-  // Récupérer les études avec pagination
-  getPaginated: async (page = 0, size = 10, sortBy = 'dateDebut', direction = 'DESC') => {
-    try {
-      console.log(`Appel pagination avec page=${page}, size=${size}`);
-      // Utilisez l'objet api importé comme pour les autres méthodes
-      const response = await api.get(`${ETUDES_ENDPOINT}/paginated`, {
-        params: {
-          page,
-          size,
-          sortBy,
-          direction
-        }
-      });
-      console.log('Réponse pagination type:', typeof response.data);
-      console.log('Réponse pagination:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Erreur pagination:', error);
       throw error;
     }
   },

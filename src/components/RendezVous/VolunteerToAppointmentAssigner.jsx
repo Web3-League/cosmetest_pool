@@ -583,7 +583,7 @@ const VolunteerToAppointmentAssigner = () => {
               disabled={loading}
             >
               <option value="">-- Choisir une étude --</option>
-              {etudes.map(etude => (
+              {[...etudes].reverse().map(etude => (
                 <option key={etude.id || etude.idEtude} value={etude.id || etude.idEtude}>
                   {etude.ref || 'N/A'} - {etude.titre || 'Sans titre'}
                 </option>

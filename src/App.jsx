@@ -10,9 +10,9 @@ import VolontaireForm from './components/Volontaires/VolontaireForm'
 import EtudesPage from './components/Etudes/EtudesPage'
 //import EtudeForm from './components/Etudes/EtudeForm'
 import EtudeDetail from './components/Etudes/EtudeDetail'
-import PanelList from './components/Panel/PanelList';
-import PanelDetail from './components/Panel/PanelDetail';
-import PanelForm from './components/Panel/PanelForm';
+//import PanelList from './components/Panel/PanelList';
+//import PanelDetail from './components/Panel/PanelDetail';
+//import PanelForm from './components/Panel/PanelForm';
 import PanelHcList from './components/Panel/PanelHcList';
 import PanelHcForm from './components/Panel/PanelHcForm';
 import PanelHcDetail from './components/Panel/PanelHcDetail';
@@ -35,6 +35,10 @@ import GroupesPage from './components/Etudes/GroupesPage';
 import GroupeDetails from './components/Etudes/GroupeDetails';
 import GroupeForm from './components/Etudes/GroupeForm';
 import EtudeFormEnhanced from './components/Etudes/EtudeFormEnhanced'
+
+// Import pour les paramètres
+import SettingsPage from './components/Parametres/SettingSPage';
+import ProfilePage from './components/Parametres/ProfilePage';
 
 function App() {
   const { isLoading } = useAuth()
@@ -83,10 +87,11 @@ function App() {
           <Route path="/rdvs/assigner" element={<VolunteerToAppointmentAssigner />} />
 
           {/* Panels */}
-          <Route path="/panels" element={<PanelList />} />
+          {/*<Route path="/panels" element={<PanelList />} />
           <Route path="/panels/:idPanel" element={<PanelDetail />} />
           <Route path="/panels/nouveau" element={<PanelForm />} />
           <Route path="/panels/:idPanel/edit" element={<PanelForm />} />
+          */}
 
           {/* Panel HC (Habitudes Cosmétiques) */}
           <Route path="/panels-hc" element={<PanelHcList />} />
@@ -100,6 +105,10 @@ function App() {
 
           {/* Rapports */}
           <Route path="/rapports" element={<RapportsPage />} />
+
+          {/* Routes pour les paramètres */}
+          <Route path="/parametres" element={<SettingsPage />} />
+          <Route path="/profil" element={<ProfilePage />} />
 
 
         </Route>

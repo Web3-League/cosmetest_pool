@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '../../services/api';
 import rdvService from '../../services/rdvService';
-
 
 const AppointmentCreator = ({
   volunteers,
@@ -12,25 +12,90 @@ const AppointmentCreator = ({
   onBack,
   onSuccess
 }) => {
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [duration, setDuration] = useState(30);
-  const [comments, setComments] = useState('');
-  const [group, setGroup] = useState('');
   const [status, setStatus] = useState('PLANIFIE');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [comments, setComments] = useState('');
   const [error, setError] = useState(null);
-  const [groups, setGroups] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentStudyId, setCurrentStudyId] = useState(selectedStudy?.id || '');
+  const [loadingGroups, setLoadingGroups] = useState(false);
+
+  // Effet pour maintenir la synchronisation entre props et état local
+  useEffect(() => {
+    if (selectedStudy?.id && selectedStudy.id !== currentStudyId) {
+      setCurrentStudyId(selectedStudy.id);
+      loadGroupsForStudy(selectedStudy.id);
+    }
+  }, [selectedStudy, currentStudyId]);
+
+  // Fonction pour charger les groupes d'une étude via l'API
+  const loadGroupsForStudy = async (studyId) => {
+    if (!studyId) return;
+    
+    try {
+      setLoadingGroups(true);
+      setError(null);
+      console.log(`Chargement des groupes pour l'étude ID: ${studyId}`);
+      
+      // Appel à l'API REST pour récupérer les groupes de l'étude
+      const response = await api.get(`/groupes/etude/${studyId}`);
+      
+      // Déterminer si la réponse est un tableau ou contient un sous-objet 'content'
+      let groupsData = response.data;
+      if (response.data && response.data.content && Array.isArray(response.data.content)) {
+        groupsData = response.data.content;
+      } else if (!Array.isArray(response.data)) {
+        console.warn("Format de réponse inattendu:", response.data);
+        groupsData = [];
+      }
+      
+      console.log("Données de groupes extraites:", groupsData);
+      
+      // Simplement configurer les données brutes - ne pas trop les traiter
+      const formattedGroups = groupsData.map(group => {
+        return {
+          ...group,
+          // S'assurer que les propriétés essentielles existent
+          id: group.idGroupe,
+          intitule: group.intitule || group.nom || `Groupe ${group.id}`
+        };
+      });
+      
+      console.log('Groupes formatés:', formattedGroups);
+      setGroups(formattedGroups);
+      
+      // Réinitialiser le groupe sélectionné seulement lors du changement d'étude
+      setSelectedGroup('');
+    } catch (err) {
+      console.error('Erreur lors du chargement des groupes:', err);
+      setError(`Erreur lors du chargement des groupes: ${err.message}`);
+      setGroups([]);
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
 
   // Charger les groupes lorsqu'une étude est sélectionnée
   const handleStudyChange = (studyId) => {
+    setCurrentStudyId(studyId);
     const study = studies.find(s => s.id === studyId);
     onStudySelect(study);
+
+    // Charger les groupes via l'API REST
     loadGroupsForStudy(studyId);
-    setGroup('');
   };
 
   const handleSubmit = async () => {
+    // Validation des entrées
+    if (!currentStudyId) {
+      setError('Veuillez sélectionner une étude');
+      return;
+    }
+
     if (!date || !time) {
       setError('La date et l\'heure sont obligatoires');
       return;
@@ -40,28 +105,64 @@ const AppointmentCreator = ({
       setIsSubmitting(true);
       setError(null);
 
+      // Récupérer l'étude actuelle à partir de l'ID local
+      const currentStudy = studies.find(s => s.id === currentStudyId);
+      
+      // Convertir les IDs en nombres pour le backend
+      let studyId, groupId = null;
+      
+      try {
+        studyId = parseInt(currentStudyId, 10);
+        if (isNaN(studyId)) {
+          throw new Error(`ID d'étude non numérique: ${currentStudyId}`);
+        }
+        
+        if (selectedGroup) {
+          groupId = parseInt(selectedGroup, 10);
+          if (isNaN(groupId)) {
+            throw new Error(`ID de groupe non numérique: ${selectedGroup}`);
+          }
+        }
+      } catch (convErr) {
+        console.error("Erreur de conversion:", convErr);
+        throw new Error(`Erreur de conversion: ${convErr.message}`);
+      }
+
+      console.log("IDs numériques - Étude:", studyId, "Groupe:", groupId);
+
+      // Préparer les données pour l'API
       const appointmentData = {
-        date,
+        idEtude: studyId,
+        idGroupe: groupId,
+        idVolontaire: selectedVolunteer?.id || null,
+        date: date,
         heure: time,
         duree: duration,
-        commentaires: comments,
         etat: status,
-        idEtude: selectedStudy?.id || null,
-        idGroupe: group || null,
-        idVolontaire: selectedVolunteer?.id || null,
+        commentaires: comments
       };
 
-      // Utiliser le service RDV pour créer le rendez-vous
+      console.log("Données à envoyer:", JSON.stringify(appointmentData, null, 2));
+
+      // Créer le rendez-vous
       const response = await rdvService.create(appointmentData);
+      
+      // Vérifier si la réponse est valide
+      if (!response || (response.error && response.error.message)) {
+        throw new Error(response.error?.message || 'Erreur lors de la création du rendez-vous');
+      }
+      
       const result = response.data || response;
 
-      // Réinitialiser le formulaire
+      // Réinitialiser seulement les champs de base, garder étude et groupe
       setDate('');
       setTime('');
       setDuration(30);
       setComments('');
 
       if (onSuccess) {
+        // S'assurer que l'étude reste sélectionnée avant d'appeler onSuccess
+        onStudySelect(currentStudy);
         onSuccess(result);
       }
 
@@ -72,27 +173,6 @@ const AppointmentCreator = ({
       setIsSubmitting(false);
     }
   };
-
-  const loadGroupsForStudy = async (studyId) => {
-    try {
-      // Dans une vraie application, vous feriez un appel API ici
-      // Ex: const groupsResponse = await groupService.getByStudyId(studyId);
-      // const groups = groupsResponse.data || groupsResponse;
-
-      // Pour l'instant, nous utilisons les groupes stockés localement dans l'objet study
-      const study = studies.find(s => s.id === studyId);
-
-      if (study && study.groups) {
-        setGroups(study.groups);
-      } else {
-        setGroups([]);
-      }
-    } catch (err) {
-      console.error("Erreur lors du chargement des groupes:", err);
-      setGroups([]);
-    }
-  };
-
 
   // Générer les options d'heures (de 7h à 23h par paliers de 5 minutes)
   const generateTimeOptions = () => {
@@ -114,6 +194,29 @@ const AppointmentCreator = ({
       options.push(i);
     }
     return options;
+  };
+
+  // Inspéction de la structure des groupes disponibles
+  const inspectGroups = () => {
+    if (!groups || groups.length === 0) return null;
+    
+    const sample = groups[0];
+    const keys = Object.keys(sample);
+    
+    return (
+      <div className="text-xs mt-2 p-2 bg-gray-100 rounded">
+        <p>Structure du premier groupe ({groups.length} groupes au total):</p>
+        <ul className="list-disc pl-4">
+          {keys.map(key => (
+            <li key={key}>
+              {key}: {typeof sample[key] === 'object' 
+                ? 'objet' 
+                : JSON.stringify(sample[key])}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   };
 
   const timeOptions = generateTimeOptions();
@@ -146,11 +249,11 @@ const AppointmentCreator = ({
             </label>
             <select
               className="w-full border border-gray-300 rounded-md px-3 py-2"
-              value={selectedStudy?.id || ''}
+              value={currentStudyId}
               onChange={(e) => handleStudyChange(e.target.value)}
             >
               <option value="">Sélectionner une étude</option>
-              {studies.map(study => (
+              {[...studies].reverse().map(study => (
                 <option key={study.id} value={study.id}>
                   {study.ref} - {study.titre}
                 </option>
@@ -158,24 +261,58 @@ const AppointmentCreator = ({
             </select>
           </div>
 
-          {/* Sélection de groupe (si une étude est sélectionnée) */}
+          {/* Sélection de groupe */}
           <div>
             <label className="block text-gray-700 font-medium mb-2">
-              Groupe
+              Groupe (facultatif)
             </label>
             <select
               className="w-full border border-gray-300 rounded-md px-3 py-2"
-              value={group}
-              onChange={(e) => setGroup(e.target.value)}
-              disabled={!selectedStudy || groups.length === 0}
+              value={selectedGroup}
+              onChange={(e) => setSelectedGroup(e.target.value)}
+              disabled={!currentStudyId || loadingGroups}
             >
-              <option value="">Sélectionner un groupe</option>
+              <option value="">
+                {loadingGroups 
+                  ? "Chargement des groupes..." 
+                  : groups.length === 0 
+                    ? "Aucun groupe disponible" 
+                    : "Sélectionner un groupe (optionnel)"}
+              </option>
               {groups.map(group => (
                 <option key={group.id} value={group.id}>
                   {group.intitule}
                 </option>
               ))}
             </select>
+            
+            {loadingGroups && (
+              <p className="mt-1 text-sm text-blue-600">
+                Chargement des groupes en cours...
+              </p>
+            )}
+            
+            {groups.length === 0 && currentStudyId && !loadingGroups && (
+              <div>
+                <p className="mt-1 text-sm text-yellow-600">
+                  Aucun groupe trouvé pour cette étude.
+                </p>
+                <button 
+                  onClick={() => loadGroupsForStudy(currentStudyId)}
+                  className="mt-1 text-xs text-blue-600 underline"
+                >
+                  Essayer de recharger les groupes
+                </button>
+              </div>
+            )}
+            
+            {selectedGroup && (
+              <p className="mt-1 text-xs text-gray-500">
+                ID du groupe: {selectedGroup}
+              </p>
+            )}
+            
+            {groups.length > 0 && inspectGroups()}
           </div>
 
           {/* Sélection de volontaire */}
@@ -203,7 +340,7 @@ const AppointmentCreator = ({
           {/* Date */}
           <div>
             <label className="block text-gray-700 font-medium mb-2">
-              Date (JJ-MM-AAAA)
+              Date
             </label>
             <input
               type="date"
@@ -224,8 +361,8 @@ const AppointmentCreator = ({
               onChange={(e) => setTime(e.target.value)}
             >
               <option value="">Sélectionner une heure</option>
-              {timeOptions.map((time, index) => (
-                <option key={index} value={time}>{time}</option>
+              {timeOptions.map((timeOption, index) => (
+                <option key={index} value={timeOption}>{timeOption}</option>
               ))}
             </select>
           </div>
@@ -233,15 +370,15 @@ const AppointmentCreator = ({
           {/* Durée */}
           <div>
             <label className="block text-gray-700 font-medium mb-2">
-              Durée (min)
+              Durée (minutes)
             </label>
             <select
               className="w-full border border-gray-300 rounded-md px-3 py-2"
               value={duration}
               onChange={(e) => setDuration(parseInt(e.target.value))}
             >
-              {durationOptions.map((duration, index) => (
-                <option key={index} value={duration}>{duration}</option>
+              {durationOptions.map((durationOption, index) => (
+                <option key={index} value={durationOption}>{durationOption}</option>
               ))}
             </select>
           </div>
@@ -280,7 +417,7 @@ const AppointmentCreator = ({
         <div className="flex justify-end mt-6">
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={isSubmitting || !currentStudyId}
             className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
             {isSubmitting ? 'Création en cours...' : 'Créer le rendez-vous'}

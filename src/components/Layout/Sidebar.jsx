@@ -10,7 +10,7 @@ import dashboardSvg from '../../assets/icons/dashboard.svg';
 import volunteersSvg from '../../assets/icons/volunteers.svg';
 import studiesSvg from '../../assets/icons/studies.svg';
 import appointmentsSvg from '../../assets/icons/appointments.svg';
-import panelsSvg from '../../assets/icons/panels.svg';
+//import panelsSvg from '../../assets/icons/panels.svg';
 import preregisteredSvg from '../../assets/icons/preregistered.svg';
 import reportsSvg from '../../assets/icons/reports.svg';
 import chevronLeftSvg from '../../assets/icons/chevron-left.svg';
@@ -55,7 +55,7 @@ const AppointmentsIcon = ({ className = "", isActive = false, ...props }) => (
   />
 );
 
-const PanelsIcon = ({ className = "", isActive = false, ...props }) => (
+/*const PanelsIcon = ({ className = "", isActive = false, ...props }) => (
   <img
     src={panelsSvg}
     className={`${styles.menuIcon} ${isActive ? styles.activeIcon : ''} ${className}`}
@@ -63,7 +63,7 @@ const PanelsIcon = ({ className = "", isActive = false, ...props }) => (
     {...props}
   />
 );
-
+*/
 const PreregisteredIcon = ({ className = "", isActive = false, ...props }) => (
   <img
     src={preregisteredSvg}
@@ -192,16 +192,13 @@ const Sidebar = ({ onToggle }) => {
         },
       ]
     },
+    /*
     {
       label: 'Panels',
       icon: (isActive) => <PanelsIcon className="w-5 h-5" isActive={isActive} />,
       path: '/panels'
     },
-    {
-      label: 'Préinscrits',
-      icon: (isActive) => <PreregisteredIcon className="w-5 h-5" isActive={isActive} />,
-      path: '/preinscrits'
-    },
+    */
     {
       label: 'Rapports',
       icon: (isActive) => <ReportsIcon className="w-5 h-5" isActive={isActive} />,

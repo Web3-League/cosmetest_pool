@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import volontaireService from '../../services/volontaireService'
 import rdvService from '../../services/rdvService'
+import etudeVolontaireService from '../../services/etudeVolontaireService'
 import photoService from '../../services/photoService'
 import { formatGender, formatSkinType, formatPhototype, formatEthnie } from '../../utils/formatters'
 import { ChevronRightIcon } from '../../components/icons'
 import { formatDate, calculateAgeFromDate } from '../../utils/dateUtils'
 import PhotoViewer from './PhotoViewer.jsx'
 import VolontairePhoto from './VolontairePhoto.jsx'
+import VolontaireDetailRdv from './VolontaireDetailRdv.jsx'
+import VolontaireDetailEtude from './VolontaireDetailEtude.jsx'
 
 const VolontaireDetails = () => {
   const { id } = useParams()
@@ -17,7 +20,7 @@ const VolontaireDetails = () => {
   const [volontaire, setVolontaire] = useState(null)
   const [detailsData, setDetailsData] = useState(null)
   const [rdvs, setRdvs] = useState([])
-  const [etudes, setEtudes] = useState([])
+  const [etudesCount, setEtudesCount] = useState(0) // Nouveau state pour le compteur
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('info')
@@ -66,25 +69,7 @@ const VolontaireDetails = () => {
       setIsUploadingPhoto(false);
     }
   };
-  
-  // Fonction pour supprimer une photo
-  const handleDeletePhoto = async (photoName) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette photo ? Cette action est irréversible.')) {
-      try {
-        const result = await photoService.deleteVolontairePhoto(id, photoName);
-        if (result.success) {
-          // Recharger les photos après la suppression
-          await fetchPhotos();
-        } else {
-          alert(result.message || 'Une erreur est survenue lors de la suppression de la photo');
-        }
-      } catch (error) {
-        console.error('Erreur lors de la suppression de la photo:', error);
-        alert('Une erreur est survenue lors de la suppression de la photo');
-      }
-    }
-  };
-  
+
   // Effet pour charger les photos quand le volontaire est disponible
   useEffect(() => {
     if (volontaire && volontaire.nomVol) {
@@ -114,11 +99,22 @@ const VolontaireDetails = () => {
         
         // Charger les rendez-vous du volontaire
         try {
-          const rdvsResponse = await rdvService.getByVolontaire(id)
-          setRdvs(rdvsResponse.data || [])
+          const rdvsData = await rdvService.getByVolontaire(id)
+          setRdvs(Array.isArray(rdvsData) ? rdvsData : [])
         } catch (rdvsError) {
-          console.warn('Erreur lors du chargement des rendez-vous:', rdvsError)
-          // Continuer même si les rendez-vous ne sont pas disponibles
+          console.error('=== ERREUR CHARGEMENT RDVs ===')
+          console.error('Erreur complète:', rdvsError)
+          console.error('Message:', rdvsError.message)
+          console.error('Stack:', rdvsError.stack)
+          setRdvs([]) // S'assurer que rdvs est un tableau vide en cas d'erreur
+        }
+        
+        // Charger le nombre d'études pour l'onglet
+        try {
+          const etudesResponse = await etudeVolontaireService.getEtudesByVolontaire(id);
+          setEtudesCount((etudesResponse.data || []).length);
+        } catch (etudesError) {
+          console.warn('Erreur lors du comptage des études:', etudesError);
         }
         
       } catch (error) {
@@ -129,7 +125,11 @@ const VolontaireDetails = () => {
       }
     }
     
-    fetchData()
+    if (id) {
+      fetchData()
+    } else {
+      console.error('Aucun ID fourni pour le volontaire')
+    }
   }, [id])
   
   const handleDelete = async () => {
@@ -309,94 +309,146 @@ const VolontaireDetails = () => {
         
         <div className="p-6">
           {activeTab === 'info' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Coordonnées</h2>
-                <dl className="space-y-2">
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Nom</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">{volontaireDisplayData.nomVol}</dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Prénom</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">{volontaireDisplayData.prenomVol}</dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Email</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">{volontaireDisplayData.emailVol}</dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Téléphone</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">{volontaireDisplayData.telPortableVol || volontaireDisplayData.telDomicileVol || '-'}</dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Adresse</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {volontaireDisplayData.adresseVol ? (
-                        <>
-                          {volontaireDisplayData.adresseVol}<br />
-                          {volontaireDisplayData.cpVol} {volontaireDisplayData.villeVol}<br />
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </dd>
-                  </div>
-                </dl>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Photo de face - petite taille */}
+              <div className="lg:col-span-1">
+                <h2 className="text-lg font-semibold mb-4">Photo</h2>
+                <div className="w-48 h-48 mx-auto lg:mx-0 border rounded-lg overflow-hidden shadow-sm bg-gray-50">
+                  <VolontairePhoto
+                    volontaireId={volontaire.id}
+                    photoType="face"
+                    className="w-full h-full"
+                    onPhotoLoad={() => console.log("Photo de face chargée")}
+                    onPhotoError={(err) => console.log("Erreur photo face:", err)}
+                    onPhotoClick={(photo) => setSelectedPhoto({
+                      url: photo.url,
+                      alt: `Photo de face de ${volontaire.nomVol} ${volontaire.prenomVol}`
+                    })}
+                  />
+                </div>
               </div>
               
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Caractéristiques</h2>
-                <dl className="space-y-2">
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Date de naissance</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {volontaireDisplayData.dateNaissance ? formatDate(volontaireDisplayData.dateNaissance) : '-'}
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Âge</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {calculateAgeFromDate(volontaireDisplayData.dateNaissance) 
-                        ? `${calculateAgeFromDate(volontaireDisplayData.dateNaissance)} ans` 
-                        : '-'}
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Sexe</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {formatGender(volontaireDisplayData.sexe)}
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Type de peau</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {formatSkinType(volontaireDisplayData.typePeau) || '-'}
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Phototype</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {formatPhototype(volontaireDisplayData.phototype) || '-'}
-                    </dd>
-                  </div>
-                  <div className="grid grid-cols-3">
-                    <dt className="text-sm font-medium text-gray-500">Ethnie</dt>
-                    <dd className="text-sm text-gray-900 col-span-2">
-                      {formatEthnie(volontaireDisplayData.ethnie) || '-'}
-                    </dd>
-                  </div>
-                  {volontaireDisplayData.dateAjout && (
-                    <div className="grid grid-cols-3">
-                      <dt className="text-sm font-medium text-gray-500">Date d'ajout</dt>
-                      <dd className="text-sm text-gray-900 col-span-2">
-                        {formatDate(volontaireDisplayData.dateAjout)}
+              {/* Informations détaillées */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Coordonnées */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Coordonnées</h2>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Nom</dt>
+                      <dd className="text-sm text-gray-900 mt-1">{volontaireDisplayData.nomVol}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Prénom</dt>
+                      <dd className="text-sm text-gray-900 mt-1">{volontaireDisplayData.prenomVol}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Email</dt>
+                      <dd className="text-sm text-gray-900 mt-1">{volontaireDisplayData.emailVol}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Téléphone</dt>
+                      <dd className="text-sm text-gray-900 mt-1">{volontaireDisplayData.telPortableVol || volontaireDisplayData.telDomicileVol || '-'}</dd>
+                    </div>
+                    <div className="md:col-span-2">
+                      <dt className="text-sm font-medium text-gray-500">Adresse</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {volontaireDisplayData.adresseVol ? (
+                          <>
+                            {volontaireDisplayData.adresseVol}<br />
+                            {volontaireDisplayData.cpVol} {volontaireDisplayData.villeVol}<br />
+                          </>
+                        ) : (
+                          '-'
+                        )}
                       </dd>
                     </div>
-                  )}
-                </dl>
+                  </dl>
+                </div>
+                
+                {/* Caractéristiques */}
+                <div>
+                  <h2 className="text-lg font-semibold mb-4">Caractéristiques</h2>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Date de naissance</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {volontaireDisplayData.dateNaissance ? formatDate(volontaireDisplayData.dateNaissance) : '-'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Âge</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {calculateAgeFromDate(volontaireDisplayData.dateNaissance) 
+                          ? `${calculateAgeFromDate(volontaireDisplayData.dateNaissance)} ans` 
+                          : '-'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Sexe</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {formatGender(volontaireDisplayData.sexe)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Type de peau</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {formatSkinType(volontaireDisplayData.typePeau) || '-'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Phototype</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {formatPhototype(volontaireDisplayData.phototype) || '-'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Ethnie</dt>
+                      <dd className="text-sm text-gray-900 mt-1">
+                        {formatEthnie(volontaireDisplayData.ethnie) || '-'}
+                      </dd>
+                    </div>
+                    {volontaireDisplayData.dateAjout && (
+                      <div className="md:col-span-2">
+                        <dt className="text-sm font-medium text-gray-500">Date d'ajout</dt>
+                        <dd className="text-sm text-gray-900 mt-1">
+                          {formatDate(volontaireDisplayData.dateAjout)}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+
+                {/* Caractéristiques physiques supplémentaires */}
+                {(volontaireDisplayData.taille || volontaireDisplayData.poids) && (
+                  <div>
+                    <h2 className="text-lg font-semibold mb-4">Caractéristiques physiques</h2>
+                    <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {volontaireDisplayData.taille && (
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Taille</dt>
+                          <dd className="text-sm text-gray-900 mt-1">{volontaireDisplayData.taille} cm</dd>
+                        </div>
+                      )}
+                      {volontaireDisplayData.poids && (
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Poids</dt>
+                          <dd className="text-sm text-gray-900 mt-1">{volontaireDisplayData.poids} kg</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </div>
+                )}
               </div>
             </div>
+          )}
+          
+          {activeTab === 'rdvs' && (
+            <VolontaireDetailRdv volontaireId={id} rdvs={rdvs} />
+          )}
+          
+          {activeTab === 'etudes' && (
+            <VolontaireDetailEtude volontaireId={id} />
           )}
           
           {activeTab === 'photos' && (

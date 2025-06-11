@@ -58,18 +58,29 @@ export const formatDateTime = (date) => {
 
 /**
  * Formate l'heure d'une date (HH:MM)
- * @param {string|Date} date - Date contenant l'heure à extraire
+ * @param {string|Date|null} time - Heure à formater (peut être une string HH:MM ou une date)
  * @returns {string} - Heure formatée
  */
-export const formatTime = (date) => {
-  if (!date) return '';
+export const formatTime = (time) => {
+  if (!time) return '-';
   
   try {
-    const dateObj = date instanceof Date ? date : new Date(date);
+    // Si c'est déjà une string au format HH:MM, la retourner directement
+    if (typeof time === 'string' && /^\d{2}:\d{2}$/.test(time)) {
+      return time;
+    }
+    
+    // Si c'est une string qui ressemble à une heure (ex: "14:30:00")
+    if (typeof time === 'string' && /^\d{2}:\d{2}:\d{2}$/.test(time)) {
+      return time.substring(0, 5); // Retourner seulement HH:MM
+    }
+    
+    // Essayer de parser comme une date
+    const dateObj = time instanceof Date ? time : new Date(time);
     
     // Vérifier si la date est valide
     if (isNaN(dateObj.getTime())) {
-      return typeof date === 'string' ? date : '';
+      return typeof time === 'string' ? time : '-';
     }
     
     return dateObj.toLocaleTimeString('fr-FR', {
@@ -78,7 +89,7 @@ export const formatTime = (date) => {
     });
   } catch (error) {
     console.error('Erreur lors du formatage de l\'heure:', error);
-    return typeof date === 'string' ? date : '';
+    return typeof time === 'string' ? time : '-';
   }
 };
 
@@ -136,6 +147,15 @@ export const calculateAge = (dateNaissance) => {
     console.error('Erreur lors du calcul de l\'âge:', error);
     return null;
   }
+};
+
+/**
+ * Calcule l'âge à partir d'une date de naissance (alias pour calculateAge)
+ * @param {string|Date} dateOfBirth - Date de naissance
+ * @returns {number|null} - Âge calculé ou null si date invalide
+ */
+export const calculateAgeFromDate = (dateOfBirth) => {
+  return calculateAge(dateOfBirth);
 };
 
 /**
@@ -218,6 +238,28 @@ export const isToday = (date) => {
 };
 
 /**
+ * Vérifie si une date tombe un week-end (samedi ou dimanche)
+ * @param {Date} date - Date à vérifier
+ * @returns {boolean} - true si c'est un week-end
+ */
+export const isWeekend = (date) => {
+  const day = date.getDay();
+  return day === 0 || day === 6; // 0 = dimanche, 6 = samedi
+};
+
+/**
+ * Vérifie si deux dates sont le même jour
+ * @param {Date} date1 - Première date
+ * @param {Date} date2 - Deuxième date
+ * @returns {boolean} - true si c'est le même jour
+ */
+export const isSameDay = (date1, date2) => {
+  return date1.getDate() === date2.getDate() &&
+         date1.getMonth() === date2.getMonth() &&
+         date1.getFullYear() === date2.getFullYear();
+};
+
+/**
  * Génère les jours pour un affichage de calendrier
  * @param {Date|string} date - Date à partir de laquelle générer le calendrier
  * @param {number} [offset=0] - Décalage de mois (0 pour le mois actuel, 1 pour le mois suivant, etc.)
@@ -292,64 +334,18 @@ export const getCalendarDays = (date, offset = 0) => {
   return calendarDays;
 };
 
-/**
- * Vérifie si une date tombe un week-end (samedi ou dimanche)
- * @param {Date} date - Date à vérifier
- * @returns {boolean} - true si c'est un week-end
- */
-export const isWeekend = (date) => {
-  const day = date.getDay();
-  return day === 0 || day === 6; // 0 = dimanche, 6 = samedi
-};
-
-/**
- * Vérifie si deux dates sont le même jour
- * @param {Date} date1 - Première date
- * @param {Date} date2 - Deuxième date
- * @returns {boolean} - true si c'est le même jour
- */
-export const isSameDay = (date1, date2) => {
-  return date1.getDate() === date2.getDate() &&
-         date1.getMonth() === date2.getMonth() &&
-         date1.getFullYear() === date2.getFullYear();
-};
-
-// utils/dateUtils.js
-
-// Ajouter cette fonction
-export const calculateAgeFromDate = (dateOfBirth) => {
-  if (!dateOfBirth) return null;
-  
-  const birthDate = typeof dateOfBirth === 'string' 
-    ? new Date(dateOfBirth) 
-    : dateOfBirth;
-  
-  if (isNaN(birthDate.getTime())) return null;
-  
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  
-  return age;
-};
-
-
-
+// Export par défaut avec toutes les fonctions
 export default {
-  calculateAgeFromDate,
-  getCalendarDays,
-  isWeekend,
-  isSameDay,
   formatDate,
   formatDateTime,
   formatTime,
   toISODateString,
   calculateAge,
+  calculateAgeFromDate,
   addDays,
   formatLongDate,
-  isToday
+  isToday,
+  isWeekend,
+  isSameDay,
+  getCalendarDays
 };

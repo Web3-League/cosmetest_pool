@@ -160,7 +160,7 @@ const AppointmentsByStudy = ({ onAppointmentClick, onBack }) => {
     };
   }, []);
 
-  // Filtrage des études
+  // Filtrage des études avec tri DESC par ID
   const filteredEtudes = Array.isArray(etudes)
     ? etudes.filter(e => {
         const ref = (e.ref || '').toLowerCase();
@@ -168,7 +168,14 @@ const AppointmentsByStudy = ({ onAppointmentClick, onBack }) => {
         const term = searchEtudeTerm.toLowerCase();
         
         return ref.includes(term) || titre.includes(term);
-      }).slice(0, 50)
+      })
+      .sort((a, b) => {
+        // Tri par ID en ordre décroissant (les plus récentes en premier)
+        const idA = a.idEtude || a.id || 0;
+        const idB = b.idEtude || b.id || 0;
+        return idB - idA;
+      })
+      .slice(0, 50)
     : [];
     
   // Filtrage des volontaires

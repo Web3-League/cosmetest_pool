@@ -250,7 +250,6 @@ const defaultStats = {
   volontairesActifs: 0,
   etudesEnCours: 0,
   rdvToday: 0,
-  preinscrits: 0
 };
 
 const defaultProchainRdvs = [];
@@ -451,7 +450,7 @@ const Dashboard = () => {
       )}
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Volontaires actifs"
           value={stats.volontairesActifs}
@@ -469,12 +468,6 @@ const Dashboard = () => {
           value={stats.rdvToday}
           color="yellow"
           icon={<CalendarIcon width={28} height={28} />}
-        />
-        <StatCard
-          title="Préinscrits"
-          value={stats.preinscrits}
-          color="purple"
-          icon={<ClipboardIcon width={28} height={28} />}
         />
       </div>
       

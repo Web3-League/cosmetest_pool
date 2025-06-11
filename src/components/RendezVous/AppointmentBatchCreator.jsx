@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import rdvService from '../../services/rdvService';
 
 const AppointmentBatchCreator = ({
@@ -41,7 +41,7 @@ const AppointmentBatchCreator = ({
       console.log(`Chargement des groupes pour l'étude ID: ${studyId}`);
       
       // Appel à l'API REST pour récupérer les groupes de l'étude
-      const response = await axios.get(`/api/groupes/etude/${studyId}`);
+      const response = await api.get(`/groupes/etude/${studyId}`);
       
       // Déterminer si la réponse est un tableau ou contient un sous-objet 'content'
       let groupsData = response.data;
@@ -341,7 +341,7 @@ const AppointmentBatchCreator = ({
               onChange={(e) => handleStudyChange(e.target.value)}
             >
               <option value="">Sélectionner une étude</option>
-              {studies.map(study => (
+              {[...studies].reverse().map(study => (
                 <option key={study.id} value={study.id}>
                   {study.ref} - {study.titre}
                 </option>

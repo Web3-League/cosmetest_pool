@@ -140,13 +140,13 @@ const Navbar = () => {
           {/* Dropdown menu */}
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10 border border-gray-200">
-              <a href="/profil" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              <a href="/cosmetest/profil" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                 <div className="flex items-center">
                   <UserIcon className="w-5 h-5 mr-2" />
                   Mon profil
                 </div>
               </a>
-              <a href="/parametres" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+              <a href="/cosmetest/parametres" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                 <div className="flex items-center">
                   <SettingsIcon className="w-5 h-5 mr-2" />
                   Paramètres
