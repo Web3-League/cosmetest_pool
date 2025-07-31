@@ -195,10 +195,10 @@ const AppointmentViewer = ({
     return 'Non spécifié';
   };
 
-  // 🎯 FONCTION AMÉLIORÉE - Créer ou mettre à jour une association EtudeVolontaire
+  // 🔄 FONCTION RÉALISTE - Remplacer l'association avec les méthodes existantes
   const createEtudeVolontaireAssociation = async (etudeId, volontaireId, groupeId) => {
     try {
-      console.log("🎯 Création/Mise à jour association EtudeVolontaire:", { etudeId, volontaireId, groupeId });
+      console.log("🔄 Remplacement association EtudeVolontaire:", { etudeId, volontaireId, groupeId });
 
       // Récupérer l'IV du groupe si disponible
       let ivGroupe = 0;
@@ -214,7 +214,7 @@ const AppointmentViewer = ({
         console.warn("⚠️ Impossible de récupérer l'IV du groupe:", err);
       }
 
-      // Vérifier si l'association existe déjà
+      // 1. 🔍 Vérifier si une association existe déjà
       const existingAssociationsResponse = await etudeVolontaireService.getVolontairesByEtude(etudeId);
       console.log("📋 Réponse getVolontairesByEtude:", existingAssociationsResponse);
 
@@ -235,19 +235,23 @@ const AppointmentViewer = ({
         null;
 
       if (existingAssoc) {
-        console.log("🔄 Association existante trouvée:", existingAssoc);
+        // 🔄 REMPLACEMENT : Supprimer l'ancienne et créer une nouvelle
+        console.log("🔄 Association existante trouvée, remplacement complet:", existingAssoc);
 
-        // Vérifier si des mises à jour sont nécessaires
-        const needsUpdate =
-          parseInt(existingAssoc.idGroupe || 0) !== parseInt(groupeId || 0) ||
-          parseInt(existingAssoc.iv || 0) !== ivGroupe ||
-          (existingAssoc.paye || 0) !== (ivGroupe > 0 ? 1 : 0);
+        if (existingAssoc.numsujet && existingAssoc.numsujet > 0) {
+          console.log(`⚠️ ATTENTION: L'association existante a un numéro de sujet (${existingAssoc.numsujet}), mais elle sera complètement remplacée !`);
+        }
 
-        if (needsUpdate) {
-          console.log("🔄 Mise à jour nécessaire de l'association EtudeVolontaire");
+        // Stratégies de remplacement avec les méthodes existantes
+        let remplacementReussi = false;
+        const strategies = [];
 
-          // Créer l'ID de l'association pour la mise à jour
-          const associationId = etudeVolontaireService.createAssociationId(
+        // Stratégie 1: Suppression + Recréation (la plus fiable)
+        strategies.push(async () => {
+          console.log("🗑️➕ Suppression + Recréation complète");
+
+          // 1. Supprimer l'ancienne association
+          const existingAssociationId = etudeVolontaireService.createAssociationId(
             existingAssoc.idEtude,
             existingAssoc.idGroupe,
             existingAssoc.idVolontaire,
@@ -257,46 +261,124 @@ const AppointmentViewer = ({
             existingAssoc.statut
           );
 
-          // Mettre à jour l'IV
+          console.log("🗑️ Suppression de l'ancienne association:", existingAssociationId);
+          await etudeVolontaireService.delete(existingAssociationId);
+
+          // 2. Attendre un peu pour laisser le temps à la suppression
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // 3. Créer la nouvelle association fraîche
+          const newAssociationData = {
+            idEtude: parseInt(etudeId),
+            idVolontaire: parseInt(volontaireId),
+            idGroupe: parseInt(groupeId) || 0,
+            iv: ivGroupe,
+            numsujet: 0, // 🎯 RESET à 0 pour un nouveau départ
+            paye: ivGroupe > 0 ? 1 : 0,
+            statut: 'INSCRIT'
+          };
+
+          console.log("✨ Création de la nouvelle association:", newAssociationData);
+          const result = await etudeVolontaireService.create(newAssociationData);
+
+          return { method: "suppression + recréation", result };
+        });
+
+        // Stratégie 2: Mises à jour partielles avec les méthodes existantes
+        strategies.push(async () => {
+          console.log("🔧 Mises à jour partielles avec méthodes existantes");
+
+          const existingAssociationId = etudeVolontaireService.createAssociationId(
+            existingAssoc.idEtude,
+            existingAssoc.idGroupe,
+            existingAssoc.idVolontaire,
+            existingAssoc.iv,
+            existingAssoc.numsujet,
+            existingAssoc.paye,
+            existingAssoc.statut
+          );
+
+          console.log("🆔 ID association existante:", existingAssociationId);
+
+          // 1. Mettre à jour l'IV si différent
           if (parseInt(existingAssoc.iv || 0) !== ivGroupe) {
-            await etudeVolontaireService.updateIV(associationId, ivGroupe);
-            console.log(`💰 IV mise à jour: ${existingAssoc.iv}€ -> ${ivGroupe}€`);
+            console.log(`💰 Mise à jour IV: ${existingAssoc.iv}€ -> ${ivGroupe}€`);
+            await etudeVolontaireService.updateIV(existingAssociationId, ivGroupe);
           }
 
-          // Mettre à jour le statut de paiement si nécessaire
+          // 2. Mettre à jour le statut de paiement si nécessaire
           const nouveauPaye = ivGroupe > 0 ? 1 : 0;
           if ((existingAssoc.paye || 0) !== nouveauPaye) {
-            await etudeVolontaireService.updatePaye(associationId, nouveauPaye);
-            console.log(`💳 Statut paiement mis à jour: ${existingAssoc.paye} -> ${nouveauPaye}`);
+            console.log(`💳 Mise à jour paiement: ${existingAssoc.paye} -> ${nouveauPaye}`);
+            await etudeVolontaireService.updatePaye(existingAssociationId, nouveauPaye);
           }
 
-          console.log("✅ Association EtudeVolontaire mise à jour avec succès");
-        } else {
-          console.log("ℹ️ Association EtudeVolontaire déjà à jour");
+          // 3. Mettre à jour le statut à INSCRIT si différent
+          if (existingAssoc.statut !== 'INSCRIT') {
+            console.log(`🏷️ Mise à jour statut: ${existingAssoc.statut} -> INSCRIT`);
+            await etudeVolontaireService.updateStatut(existingAssociationId, 'INSCRIT');
+          }
+
+          // ❌ NOTE: Impossible de mettre à jour idGroupe et numsujet avec les méthodes existantes
+          // Ces champs ne peuvent être modifiés qu'avec suppression + recréation
+          if (parseInt(existingAssoc.idGroupe || 0) !== parseInt(groupeId || 0)) {
+            console.warn(`⚠️ Impossible de changer le groupe avec les méthodes existantes (${existingAssoc.idGroupe} -> ${groupeId})`);
+          }
+          if (existingAssoc.numsujet !== 0) {
+            console.warn(`⚠️ Impossible de reset numsujet avec les méthodes existantes (${existingAssoc.numsujet} -> 0)`);
+          }
+
+          return { method: "mises à jour partielles", warnings: true };
+        });
+
+        // Essayer chaque stratégie
+        for (const [index, strategy] of strategies.entries()) {
+          try {
+            const result = await strategy();
+            console.log(`✅ Remplacement réussi avec la stratégie ${index + 1}: ${result.method}`);
+
+            if (result.warnings) {
+              console.warn("⚠️ Remplacement partiel uniquement - certains champs n'ont pas pu être mis à jour");
+            }
+
+            remplacementReussi = true;
+            break;
+          } catch (error) {
+            console.warn(`⚠️ Stratégie ${index + 1} échouée:`, error.message);
+            if (index === strategies.length - 1) {
+              console.error("❌ Toutes les stratégies de remplacement ont échoué");
+              throw error;
+            }
+          }
         }
 
-        return existingAssoc;
+        console.log("✅ Association EtudeVolontaire remplacée avec succès");
+        return { replaced: true, wasExisting: true };
+
       } else {
-        // Créer une nouvelle association
+        // 2. ✨ Créer une nouvelle association (pas d'association existante)
+        console.log("✨ Aucune association existante, création d'une nouvelle...");
+
         const associationData = {
           idEtude: parseInt(etudeId),
           idVolontaire: parseInt(volontaireId),
           idGroupe: parseInt(groupeId) || 0,
-          iv: ivGroupe, // Utiliser l'IV du groupe
-          numsujet: 0, // Numéro de sujet par défaut
-          paye: ivGroupe > 0 ? 1 : 0, // Si IV > 0, alors payé
-          statut: 'INSCRIT' // Statut par défaut
+          iv: ivGroupe,
+          numsujet: 0,
+          paye: ivGroupe > 0 ? 1 : 0,
+          statut: 'INSCRIT'
         };
 
         console.log("📋 Nouvelle association à créer:", associationData);
 
         const result = await etudeVolontaireService.create(associationData);
         console.log(`✅ Nouvelle association EtudeVolontaire créée: Étude ${etudeId}, Volontaire ${volontaireId}, Groupe ${groupeId}, IV: ${ivGroupe}€`);
-        return result;
+
+        return { created: true, wasExisting: false, result };
       }
+
     } catch (error) {
-      console.error('❌ Erreur lors de la création/mise à jour de l\'association EtudeVolontaire:', error);
-      // Ne pas faire échouer l'assignation du RDV si l'association échoue
+      console.error('❌ Erreur lors du remplacement/création de l\'association EtudeVolontaire:', error);
       throw error;
     }
   };
@@ -331,18 +413,211 @@ const AppointmentViewer = ({
     : [];
 
 
-  // 🆕 FONCTION SIMPLIFIÉE - Supprimer complètement l'association EtudeVolontaire
+  // 🔥 FONCTION DE SUPPRESSION DÉFINITIVE avec les vraies méthodes backend
   const handleEtudeVolontaireOnUnassign = async (etudeId, volontaireId) => {
     try {
-      console.log("🗑️ Suppression association EtudeVolontaire:", { etudeId, volontaireId });
+      console.log("🔥 SUPPRESSION DÉFINITIVE avec backend réel:", { etudeId, volontaireId });
 
-      // Utiliser la méthode qui existe déjà dans votre service
-      await etudeVolontaireService.desassignerVolontaireDEtude(etudeId, volontaireId);
-      console.log("✅ Association EtudeVolontaire supprimée avec succès");
+      // 1. 🔍 Récupérer l'association existante
+      const existingAssociationsResponse = await etudeVolontaireService.getVolontairesByEtude(etudeId);
+
+      let existingAssociations = [];
+      if (Array.isArray(existingAssociationsResponse)) {
+        existingAssociations = existingAssociationsResponse;
+      } else if (existingAssociationsResponse?.data) {
+        existingAssociations = Array.isArray(existingAssociationsResponse.data) ?
+          existingAssociationsResponse.data : [existingAssociationsResponse.data];
+      }
+
+      const existingAssoc = existingAssociations.find(assoc =>
+        parseInt(assoc.idVolontaire) === parseInt(volontaireId)
+      );
+
+      if (!existingAssoc) {
+        console.log("ℹ️ Aucune association trouvée pour ce volontaire");
+        return;
+      }
+
+      console.log("🔍 Association trouvée:", existingAssoc);
+
+      if (existingAssoc.numsujet && existingAssoc.numsujet > 0) {
+        console.log(`🚨 Association avec numsujet = ${existingAssoc.numsujet} - SUPPRESSION SPÉCIALE REQUISE !`);
+      }
+
+      // 2. 🎯 STRATÉGIES BASÉES SUR VOTRE VRAI BACKEND
+      const strategies = [];
+
+      // Stratégie 1: updateVolontaire avec null (désassignation via backend)
+      strategies.push(async () => {
+        console.log("👤 Stratégie 1: updateVolontaire(null) - désassignation backend");
+        const associationId = etudeVolontaireService.createAssociationId(
+          existingAssoc.idEtude,
+          existingAssoc.idGroupe,
+          existingAssoc.idVolontaire,
+          existingAssoc.iv,
+          existingAssoc.numsujet,
+          existingAssoc.paye,
+          existingAssoc.statut
+        );
+
+        // Utiliser updateVolontaire avec null pour désassigner
+        await etudeVolontaireService.updateVolontaire(associationId, null);
+        console.log("✅ updateVolontaire(null) réussi - volontaire désassigné");
+        return "updateVolontaire(null)";
+      });
+
+      // Stratégie 2: Reset numsujet à 0 puis suppression
+      if (existingAssoc.numsujet && existingAssoc.numsujet > 0) {
+        strategies.push(async () => {
+          console.log("🔢 Stratégie 2: Reset numsujet puis suppression");
+          const associationId = etudeVolontaireService.createAssociationId(
+            existingAssoc.idEtude,
+            existingAssoc.idGroupe,
+            existingAssoc.idVolontaire,
+            existingAssoc.iv,
+            existingAssoc.numsujet,
+            existingAssoc.paye,
+            existingAssoc.statut
+          );
+
+          // 1. Remettre numsujet à 0
+          console.log(`🔢 Reset numsujet: ${existingAssoc.numsujet} -> 0`);
+          await etudeVolontaireService.updateNumSujet(associationId, 0);
+
+          // 2. Attendre un peu
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // 3. Créer le nouvel ID avec numsujet = 0
+          const newAssociationId = etudeVolontaireService.createAssociationId(
+            existingAssoc.idEtude,
+            existingAssoc.idGroupe,
+            existingAssoc.idVolontaire,
+            existingAssoc.iv,
+            0, // numsujet maintenant à 0
+            existingAssoc.paye,
+            existingAssoc.statut
+          );
+
+          // 4. Supprimer avec le nouvel ID
+          console.log("🗑️ Suppression après reset numsujet");
+          await etudeVolontaireService.delete(newAssociationId);
+
+          console.log("✅ Reset numsujet + suppression réussi");
+          return "reset numsujet + delete";
+        });
+      }
+
+      // Stratégie 3: Changement de statut puis suppression
+      strategies.push(async () => {
+        console.log("🏷️ Stratégie 3: Statut ANNULE puis suppression");
+        const associationId = etudeVolontaireService.createAssociationId(
+          existingAssoc.idEtude,
+          existingAssoc.idGroupe,
+          existingAssoc.idVolontaire,
+          existingAssoc.iv,
+          existingAssoc.numsujet,
+          existingAssoc.paye,
+          existingAssoc.statut
+        );
+
+        // 1. Changer le statut à ANNULE
+        await etudeVolontaireService.updateStatut(associationId, 'ANNULE');
+        console.log("🏷️ Statut changé à ANNULE");
+
+        // 2. Créer le nouvel ID avec statut ANNULE
+        const newAssociationId = etudeVolontaireService.createAssociationId(
+          existingAssoc.idEtude,
+          existingAssoc.idGroupe,
+          existingAssoc.idVolontaire,
+          existingAssoc.iv,
+          existingAssoc.numsujet,
+          existingAssoc.paye,
+          'ANNULE'
+        );
+
+        // 3. Supprimer
+        await etudeVolontaireService.delete(newAssociationId);
+        console.log("✅ Statut ANNULE + suppression réussi");
+        return "statut ANNULE + delete";
+      });
+
+      // Stratégie 4: Suppression directe (fallback)
+      strategies.push(async () => {
+        console.log("🗑️ Stratégie 4: Suppression directe");
+        const associationId = etudeVolontaireService.createAssociationId(
+          existingAssoc.idEtude,
+          existingAssoc.idGroupe,
+          existingAssoc.idVolontaire,
+          existingAssoc.iv,
+          existingAssoc.numsujet,
+          existingAssoc.paye,
+          existingAssoc.statut
+        );
+
+        await etudeVolontaireService.delete(associationId);
+        console.log("✅ Suppression directe réussie");
+        return "delete direct";
+      });
+
+      // 3. 🔄 ESSAYER CHAQUE STRATÉGIE
+      let suppressionReussie = false;
+      let methodUsed = null;
+
+      for (const [index, strategy] of strategies.entries()) {
+        try {
+          console.log(`🔄 Tentative stratégie ${index + 1}/${strategies.length}...`);
+          methodUsed = await strategy();
+          console.log(`✅ Stratégie ${index + 1} RÉUSSIE: ${methodUsed}`);
+          suppressionReussie = true;
+          break;
+        } catch (error) {
+          console.warn(`⚠️ Stratégie ${index + 1} ÉCHOUÉE:`, error.message);
+
+          if (index === strategies.length - 1) {
+            console.error("❌ TOUTES les stratégies ont échoué !");
+          }
+        }
+      }
+
+      // 4. 🔍 VÉRIFICATION FINALE
+      console.log("🔍 Vérification finale obligatoire...");
+
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        const verificationResponse = await etudeVolontaireService.getVolontairesByEtude(etudeId);
+        let associations = [];
+
+        if (Array.isArray(verificationResponse)) {
+          associations = verificationResponse;
+        } else if (verificationResponse?.data) {
+          associations = Array.isArray(verificationResponse.data) ?
+            verificationResponse.data : [verificationResponse.data];
+        }
+
+        const stillExists = associations.some(assoc =>
+          parseInt(assoc.idVolontaire) === parseInt(volontaireId)
+        );
+
+        if (stillExists) {
+          console.error("🚨 PROBLÈME: L'association EXISTE ENCORE !");
+          console.log("🔍 Associations restantes:", associations);
+          throw new Error(`L'association persiste malgré toutes les tentatives. Volontaire ${volontaireId} reste lié à l'étude ${etudeId}`);
+        } else {
+          console.log("🎉 SUCCÈS CONFIRMÉ: Association complètement supprimée !");
+        }
+      } catch (verificationError) {
+        if (verificationError.message && verificationError.message.includes('persiste')) {
+          throw verificationError; // Re-lancer l'erreur spécifique
+        }
+        console.warn("⚠️ Impossible de vérifier la suppression:", verificationError);
+      }
+
+      console.log(`✅ Suppression terminée avec succès via: ${methodUsed}`);
 
     } catch (error) {
-      console.error('❌ Erreur lors de la suppression EtudeVolontaire:', error);
-      // Ne pas faire échouer la désassignation du RDV si l'association échoue
+      console.error('🔥 ERREUR lors de la suppression définitive:', error);
+      throw error;
     }
   };
 

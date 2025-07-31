@@ -560,6 +560,34 @@ const etudeVolontaireService = {
       throw error;
     }
   },
+
+  // Mettre à jour le numéro de sujet (MANQUANT dans votre service !)
+  async updateNumSujet(associationId, nouveauNumSujet) {
+    try {
+      console.log("🔢 updateNumSujet Service:", { associationId, nouveauNumSujet });
+
+      const params = {
+        idEtude: parseInt(associationId.idEtude),
+        idGroupe: parseInt(associationId.idGroupe) || 0,
+        idVolontaire: parseInt(associationId.idVolontaire),
+        iv: parseInt(associationId.iv) || 0,
+        numsujet: parseInt(associationId.numsujet) || 0,
+        paye: parseInt(associationId.paye) || 0,
+        statut: String(associationId.statut) || "INSCRIT",
+        nouveauNumSujet: parseInt(nouveauNumSujet)
+      };
+
+      const response = await api.patch("/etude-volontaires/update-numsujet", null, {
+        params
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du numsujet:", error);
+      throw error;
+    }
+  },
+  
 };
 
 export default etudeVolontaireService;

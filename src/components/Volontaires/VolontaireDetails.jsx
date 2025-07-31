@@ -12,6 +12,7 @@ import PhotoViewer from './PhotoViewer.jsx'
 import VolontairePhoto from './VolontairePhoto.jsx'
 import VolontaireDetailRdv from './VolontaireDetailRdv.jsx'
 import VolontaireDetailEtude from './VolontaireDetailEtude.jsx'
+import VolontaireAppointmentAssigner from './VolontaireAppointmentAssigner.jsx'
 
 const VolontaireDetails = () => {
   const { id } = useParams()
@@ -71,6 +72,21 @@ const VolontaireDetails = () => {
       setIsUploadingPhoto(false);
     }
   };
+
+  // Fonction pour recharger les données après assignation
+  const handleAssignmentComplete = async () => {
+    try {
+      // Recharger les rendez-vous du volontaire
+      const rdvsData = await rdvService.getByVolontaire(id)
+      setRdvs(Array.isArray(rdvsData) ? rdvsData : [])
+
+      // Recharger le nombre d'études
+      const etudesResponse = await etudeVolontaireService.getEtudesByVolontaire(id);
+      setEtudesCount((etudesResponse.data || []).length);
+    } catch (error) {
+      console.warn('Erreur lors du rechargement des données:', error);
+    }
+  }
 
   // Effet pour charger les photos quand le volontaire est disponible
   useEffect(() => {
@@ -420,7 +436,7 @@ const VolontaireDetails = () => {
                 }`}
               onClick={() => setActiveTab('rdvs')}
             >
-              Rendez-vous
+              Rendez-vous ({rdvs.length})
             </button>
             <button
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'etudes'
@@ -429,7 +445,16 @@ const VolontaireDetails = () => {
                 }`}
               onClick={() => setActiveTab('etudes')}
             >
-              Études
+              Études ({etudesCount})
+            </button>
+            <button
+              className={`px-4 py-3 text-sm font-medium ${activeTab === 'assignation'
+                ? 'text-primary-600 border-b-2 border-primary-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+              onClick={() => setActiveTab('assignation')}
+            >
+              Assignation RDV
             </button>
             <button
               className={`px-4 py-3 text-sm font-medium ${activeTab === 'photos'
@@ -527,7 +552,6 @@ const VolontaireDetails = () => {
                   </dl>
                 </div>
 
-
                 <div>
                   <h2 className="text-lg font-semibold mb-4">commentaires</h2>
                   <div>
@@ -552,7 +576,6 @@ const VolontaireDetails = () => {
                   </div>
                 )}
               </div>
-              
             </div>
           )}
 
@@ -1146,6 +1169,14 @@ const VolontaireDetails = () => {
 
           {activeTab === 'etudes' && (
             <VolontaireDetailEtude volontaireId={id} />
+          )}
+
+          {activeTab === 'assignation' && (
+            <VolontaireAppointmentAssigner
+              volontaireId={id}
+              volontaire={volontaire}
+              onAssignmentComplete={handleAssignmentComplete}
+            />
           )}
 
           {activeTab === 'photos' && (
