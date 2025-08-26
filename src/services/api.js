@@ -6,7 +6,7 @@ import axios from 'axios';
 
 // Créer une instance d'axios avec la configuration de base
 const api = axios.create({
-  baseURL: 'http://192.168.127.36:8888/api',// || 'http://localhost:8888/api', // Ajustez selon l'URL de votre API
+  baseURL: 'http://localhost:8888/api',// || 'http://localhost:8888/api', // Ajustez selon l'URL de votre API
   withCredentials: true,               // Indispensable pour envoyer/recevoir les cookies cross-site
   headers: {
     'Content-Type': 'application/json'
