@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from "../../services/api";
 import etudeService from '../../services/etudeService'
 import rdvService from '../../services/rdvService'
+import groupeService from '../../services/groupeService'
 import { formatDate } from '../../utils/dateUtils'
 import VolunteerExcelExport from './VolunteerExcelExport'
 import RdvExcelExport from './RdvExcelExport'
@@ -16,8 +17,10 @@ const EtudeDetail = () => {
 
   const [etude, setEtude] = useState(null)
   const [rdvs, setRdvs] = useState([])
+  const [groupes, setGroupes] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingRdvs, setIsLoadingRdvs] = useState(true)
+  const [isLoadingGroupes, setIsLoadingGroupes] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('details')
   const [infosVolontaires, setInfosVolontaires] = useState({})
@@ -32,6 +35,23 @@ const EtudeDetail = () => {
 
   // ✅États pour l'affichage du sendEmail
   const [showEmailSender, setShowEmailSender] = useState(false)
+
+  // État pour le menu dropdown des actions
+  const [showActionsMenu, setShowActionsMenu] = useState(false)
+
+  // ✅ États pour la gestion des groupes
+  const [showGroupeForm, setShowGroupeForm] = useState(false)
+  const [newGroupe, setNewGroupe] = useState({
+    intitule: '',
+    description: '',
+    idEtude: id,
+    ageMinimum: '',
+    ageMaximum: '',
+    ethnie: [],
+    criteresSupplémentaires: '',
+    nbSujet: '',
+    iv: ''
+  })
 
   useEffect(() => {
     const fetchEtude = async () => {
@@ -66,6 +86,27 @@ const EtudeDetail = () => {
 
     if (activeTab === 'rdvs') {
       fetchRdvs()
+    }
+  }, [id, activeTab])
+
+  // Charger les groupes de l'étude
+  useEffect(() => {
+    const fetchGroupes = async () => {
+      if (!id) return
+
+      try {
+        setIsLoadingGroupes(true)
+        const data = await groupeService.getGroupesByIdEtude(id)
+        setGroupes(data)
+      } catch (error) {
+        console.error('Erreur lors du chargement des groupes:', error)
+      } finally {
+        setIsLoadingGroupes(false)
+      }
+    }
+
+    if (activeTab === 'groupes') {
+      fetchGroupes()
     }
   }, [id, activeTab])
 
@@ -203,7 +244,7 @@ const EtudeDetail = () => {
     return 'Non assigné';
   };
 
-  const chargerInfosVolontaire = async (idVolontaire) => {
+  const chargerInfosVolontaire = useCallback(async (idVolontaire) => {
     if (infosVolontaires[idVolontaire]) return;
 
     try {
@@ -222,7 +263,7 @@ const EtudeDetail = () => {
     } catch (error) {
       console.error(`Erreur lors de la récupération des infos du volontaire ${idVolontaire}:`, error);
     }
-  };
+  }, [infosVolontaires]);
 
   const sortedRdvs = () => {
     if (!rdvs || rdvs.length === 0) return []
@@ -256,12 +297,101 @@ const EtudeDetail = () => {
 
   const handleOpenEmailSender = () => {
     setShowEmailSender(true)
+    setShowActionsMenu(false)
   }
 
   const handleCloseEmailSender = () => {
     setShowEmailSender(false)
   }
 
+  // Fonctions pour la gestion des groupes
+  const ethniesDisponibles = [
+    'CAUCASIENNE',
+    'AFRICAINE', 
+    'ASIATIQUE',
+    'INDIENNE',
+    'ANTILLAISE'
+  ]
+
+  const ethniesArrayToString = (ethniesArray) => {
+    return Array.isArray(ethniesArray) ? ethniesArray.join(',') : ''
+  }
+
+  const handleGroupeChange = (e) => {
+    const { name, value } = e.target
+    
+    if (['ageMinimum', 'ageMaximum', 'nbSujet', 'iv'].includes(name)) {
+      setNewGroupe({
+        ...newGroupe,
+        [name]: value === '' ? '' : Number(value)
+      })
+    } else {
+      setNewGroupe({
+        ...newGroupe,
+        [name]: value
+      })
+    }
+  }
+
+  const handleEthnieChange = (ethnieValue) => {
+    setNewGroupe(prevGroupe => {
+      const currentEthnies = Array.isArray(prevGroupe.ethnie) ? prevGroupe.ethnie : []
+
+      if (currentEthnies.includes(ethnieValue)) {
+        return {
+          ...prevGroupe,
+          ethnie: currentEthnies.filter(e => e !== ethnieValue)
+        }
+      } else {
+        return {
+          ...prevGroupe,
+          ethnie: [...currentEthnies, ethnieValue]
+        }
+      }
+    })
+  }
+
+  const handleCreateGroupe = async (e) => {
+    e.preventDefault()
+    
+    if (!newGroupe.intitule) {
+      setError('L\'intitulé du groupe est requis')
+      return
+    }
+
+    try {
+      const dataToSend = {
+        ...newGroupe,
+        idEtude: id,
+        ethnie: ethniesArrayToString(newGroupe.ethnie)
+      }
+
+      await groupeService.create(dataToSend)
+      
+      // Recharger les groupes
+      const data = await groupeService.getGroupesByIdEtude(id)
+      setGroupes(data)
+      
+      // Reset form
+      setNewGroupe({
+        intitule: '',
+        description: '',
+        idEtude: id,
+        ageMinimum: '',
+        ageMaximum: '',
+        ethnie: [],
+        criteresSupplémentaires: '',
+        nbSujet: '',
+        iv: ''
+      })
+      
+      setShowGroupeForm(false)
+      
+    } catch (error) {
+      console.error('Erreur lors de la création du groupe:', error)
+      setError('Erreur lors de la création du groupe')
+    }
+  }
 
   useEffect(() => {
     if (rdvs && rdvs.length > 0) {
@@ -272,7 +402,7 @@ const EtudeDetail = () => {
 
       idsVolontaires.forEach(id => chargerInfosVolontaire(id));
     }
-  }, [rdvs, infosVolontaires]);
+  }, [rdvs, infosVolontaires, chargerInfosVolontaire]);
 
   const renderSortIcon = (field) => {
     if (sortField !== field) return null
@@ -311,8 +441,6 @@ const EtudeDetail = () => {
       </div>
     )
   }
-
-  // ✅ Ne pas faire de return early, gérer dans l'onglet
 
   return (
     <div className="space-y-6">
@@ -357,6 +485,15 @@ const EtudeDetail = () => {
               onClick={() => setActiveTab('rdvs')}
             >
               Rendez-vous
+            </button>
+            <button
+              className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'groupes'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              onClick={() => setActiveTab('groupes')}
+            >
+              Groupes
             </button>
           </nav>
         </div>
@@ -426,6 +563,270 @@ const EtudeDetail = () => {
             </div>
           )}
 
+          {activeTab === 'groupes' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">Groupes</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Gestion des groupes pour l'étude {etude.ref}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setShowGroupeForm(!showGroupeForm)}
+                  className="btn btn-primary inline-flex items-center"
+                >
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Nouveau Groupe
+                </button>
+              </div>
+
+              {/* Formulaire de création de groupe */}
+              {showGroupeForm && (
+                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-lg font-medium text-gray-900">Créer un nouveau groupe</h4>
+                    <button
+                      onClick={() => setShowGroupeForm(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleCreateGroupe} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="intitule" className="block text-sm font-medium text-gray-700 mb-1">
+                          Intitulé du groupe *
+                        </label>
+                        <input
+                          type="text"
+                          name="intitule"
+                          id="intitule"
+                          value={newGroupe.intitule}
+                          onChange={handleGroupeChange}
+                          className="form-input w-full"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="nbSujet" className="block text-sm font-medium text-gray-700 mb-1">
+                          Nombre de sujets
+                        </label>
+                        <input
+                          type="number"
+                          name="nbSujet"
+                          id="nbSujet"
+                          value={newGroupe.nbSujet}
+                          onChange={handleGroupeChange}
+                          min="0"
+                          className="form-input w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        name="description"
+                        id="description"
+                        value={newGroupe.description}
+                        onChange={handleGroupeChange}
+                        rows="2"
+                        className="form-textarea w-full"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label htmlFor="ageMinimum" className="block text-sm font-medium text-gray-700 mb-1">
+                          Âge minimum
+                        </label>
+                        <input
+                          type="number"
+                          name="ageMinimum"
+                          id="ageMinimum"
+                          value={newGroupe.ageMinimum}
+                          onChange={handleGroupeChange}
+                          min="0"
+                          className="form-input w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="ageMaximum" className="block text-sm font-medium text-gray-700 mb-1">
+                          Âge maximum
+                        </label>
+                        <input
+                          type="number"
+                          name="ageMaximum"
+                          id="ageMaximum"
+                          value={newGroupe.ageMaximum}
+                          onChange={handleGroupeChange}
+                          min="0"
+                          className="form-input w-full"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="iv" className="block text-sm font-medium text-gray-700 mb-1">
+                          Indemnité Volontaire
+                        </label>
+                        <input
+                          type="number"
+                          name="iv"
+                          id="iv"
+                          value={newGroupe.iv}
+                          onChange={handleGroupeChange}
+                          min="0"
+                          className="form-input w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Ethnies
+                      </label>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {ethniesDisponibles.map((ethnieOption) => (
+                          <label key={ethnieOption} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={Array.isArray(newGroupe.ethnie) && newGroupe.ethnie.includes(ethnieOption)}
+                              onChange={() => handleEthnieChange(ethnieOption)}
+                              className="form-checkbox h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                            />
+                            <span className="ml-2 text-sm text-gray-700 capitalize">
+                              {ethnieOption.toLowerCase()}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end space-x-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowGroupeForm(false)}
+                        className="btn btn-secondary"
+                      >
+                        Annuler
+                      </button>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                      >
+                        Créer le groupe
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Liste des groupes */}
+              {isLoadingGroupes ? (
+                <div className="flex justify-center items-center h-32">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+                </div>
+              ) : groupes.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun groupe</h3>
+                  <p className="mt-1 text-sm text-gray-500">Commencez par créer votre premier groupe pour cette étude.</p>
+                  <div className="mt-6">
+                    <button
+                      onClick={() => setShowGroupeForm(true)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                    >
+                      <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      Créer un groupe
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {groupes.map((groupe) => (
+                    <div key={groupe.idGroupe} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-lg font-semibold text-gray-900">{groupe.intitule}</h4>
+                            <div className="flex items-center space-x-2">
+                              {groupe.nbSujet && (
+                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                                  {groupe.nbSujet} sujets
+                                </span>
+                              )}
+                              {groupe.iv && (
+                                <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                                  {groupe.iv}€ IV
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {groupe.description && (
+                            <p className="text-gray-600 mb-3">{groupe.description}</p>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium text-gray-700">Âge:</span>
+                              <span className="ml-2 text-gray-600">
+                                {groupe.ageMinimum || groupe.ageMaximum ? 
+                                  `${groupe.ageMinimum || '?'} - ${groupe.ageMaximum || '?'} ans` : 
+                                  'Non spécifié'
+                                }
+                              </span>
+                            </div>
+
+                            {groupe.ethnie && (
+                              <div className="md:col-span-2">
+                                <span className="font-medium text-gray-700">Ethnies:</span>
+                                <span className="ml-2 text-gray-600">
+                                  {typeof groupe.ethnie === 'string' ? 
+                                    groupe.ethnie.split(',').join(', ').toLowerCase() : 
+                                    'Non spécifié'
+                                  }
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="ml-4 flex items-center space-x-2">
+                          <Link
+                            to={`/groupes/${groupe.idGroupe}/edit`}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Modifier le groupe"
+                          >
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'rdvs' && (
             <div>
               {/* ✅ Afficher le composant d'envoi d'email si activé */}
@@ -452,7 +853,6 @@ const EtudeDetail = () => {
                   <AppointmentViewer
                     appointment={selectedRdv}
                     onEdit={() => {
-                      // Utiliser la route correcte du router
                       navigate(`/rdvs`)
                     }}
                     onBack={handleBackToRdvList}
@@ -461,62 +861,152 @@ const EtudeDetail = () => {
                 </div>
               ) : (
                 <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium">Rendez-vous de l'étude</h3>
+                  {/* 🎨 En-tête amélioré avec actions regroupées */}
+                  <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 space-y-4 lg:space-y-0">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">Rendez-vous</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Gestion des rendez-vous pour l'étude {etude.ref}
+                      </p>
+                    </div>
 
-                    <div className="flex space-x-2">
-                      {/* ✅ Nouveau bouton pour l'envoi d'email de groupe */}
-                      {getUniqueVolunteerIds().length > 0 && (
-                        <button
-                          onClick={handleOpenEmailSender}
-                          className="btn btn-outline-primary btn-sm"
-                          title="Envoyer un email à tous les volontaires de l'étude"
-                        >
-                          <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          Email de groupe
-                        </button>
-                      )}
-                      {rdvs.length > 0 && (
-                        <>
-                          <RdvExcelExport
-                            rdvs={rdvs}
-                            studyRef={etude.ref}
-                            studyId={etude.idEtude}
-                            studyTitle={etude.titre}
-                            getNomVolontaire={getNomVolontaire}
-                          />
-                          <VolunteerExcelExport
-                            volunteerIds={getUniqueVolunteerIds()}
-                            studyId={etude.idEtude}
-                            studyRef={etude.ref}
-                          />
-                        </>
-                      )}
-                      {/* ✅ Remplacer le lien obsolète par navigation vers gestionnaire RDV */}
+                    {/* Actions principales */}
+                    <div className="flex items-center space-x-3">
+                      {/* Bouton principal - Gérer les RDV */}
                       <Link
                         to="/rdvs"
-                        className="btn btn-primary btn-sm"
+                        className="btn btn-outline-primary inline-flex items-center"
                       >
-                        Gérer les RDV
+                        <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Nouveau RDV
                       </Link>
+
+                      {/* Actions directes pour les fonctions principales */}
+                      {rdvs.length > 0 && (
+                        <>
+                          {/* Email de groupe - Action directe */}
+                          {getUniqueVolunteerIds().length > 0 && (
+                            <button
+                              onClick={handleOpenEmailSender}
+                              className="btn btn-outline-blue inline-flex items-center"
+                              title={`Envoyer un email aux ${getUniqueVolunteerIds().length} volontaires`}
+                            >
+                              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              <span className="hidden sm:inline">Email de groupe</span>
+                              <span className="sm:hidden">Email</span>
+                              <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                {getUniqueVolunteerIds().length}
+                              </span>
+                            </button>
+                          )}
+
+                          {/* Menu des exports */}
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowActionsMenu(!showActionsMenu)}
+                              className="btn btn-outline-gray inline-flex items-center"
+                              title="Exporter les données"
+                            >
+                              <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span className="hidden sm:inline">Exporter</span>
+                              <span className="sm:hidden">Export</span>
+                              <svg className="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+
+                            {showActionsMenu && (
+                              <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-20 overflow-hidden">
+                                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                                  <h4 className="text-sm font-medium text-gray-900">Exporter les données</h4>
+                                  <p className="text-xs text-gray-600 mt-1">Téléchargez les données au format Excel</p>
+                                </div>
+                                
+                                <div className="py-2">
+                                  {/* Export RDV */}
+                                  <div className="px-4 py-3 hover:bg-gray-50 border-b border-gray-100">
+                                    <RdvExcelExport
+                                      rdvs={rdvs}
+                                      studyRef={etude.ref}
+                                      studyId={etude.idEtude}
+                                      studyTitle={etude.titre}
+                                      getNomVolontaire={getNomVolontaire}
+                                      className="w-full"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Liste complète des {rdvs.length} rendez-vous avec détails
+                                    </p>
+                                  </div>
+
+                                  {/* Export Volontaires */}
+                                  <div className="px-4 py-3 hover:bg-gray-50">
+                                    <VolunteerExcelExport
+                                      volunteerIds={getUniqueVolunteerIds()}
+                                      studyId={etude.idEtude}
+                                      studyRef={etude.ref}
+                                      className="w-full"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Informations détaillées des {getUniqueVolunteerIds().length} volontaires
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
+                  {/* Statistiques rapides */}
                   {rdvs.length > 0 && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-sm font-medium text-blue-900">Volontaires de l'étude</h4>
-                          <p className="text-sm text-blue-700">
-                            {getUniqueVolunteerIds().length} volontaire(s) assigné(s) • {rdvs.length} rendez-vous total
-                          </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-blue-900">Volontaires</p>
+                            <p className="text-lg font-semibold text-blue-600">
+                              {getUniqueVolunteerIds().length}
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs text-blue-600">
-                            {rdvs.filter(rdv => !rdv.idVolontaire).length} RDV non assignés
-                          </span>
+                      </div>
+
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-green-900">Rendez-vous</p>
+                            <p className="text-lg font-semibold text-green-600">
+                              {rdvs.length}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-center">
+                          <svg className="h-8 w-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.864-.833-2.634 0L4.18 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-yellow-900">Non assignés</p>
+                            <p className="text-lg font-semibold text-yellow-600">
+                              {rdvs.filter(rdv => !rdv.idVolontaire).length}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -527,14 +1017,23 @@ const EtudeDetail = () => {
                       <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
                     </div>
                   ) : rdvs.length === 0 ? (
-                    <div className="text-center py-8 bg-gray-50 rounded-lg">
-                      <p className="text-gray-500">Aucun rendez-vous pour cette étude</p>
-                      <Link
-                        to="/rdvs"
-                        className="mt-2 inline-block text-primary-600 hover:text-primary-800"
-                      >
-                        Gérer les rendez-vous
-                      </Link>
+                    <div className="text-center py-12 bg-gray-50 rounded-lg">
+                      <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun rendez-vous</h3>
+                      <p className="mt-1 text-sm text-gray-500">Commencez par créer votre premier rendez-vous pour cette étude.</p>
+                      <div className="mt-6">
+                        <Link
+                          to="/rdvs"
+                          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+                        >
+                          <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                          Créer un rendez-vous
+                        </Link>
+                      </div>
                     </div>
                   ) : (
                     <div>
@@ -629,6 +1128,14 @@ const EtudeDetail = () => {
           )}
         </div>
       </div>
+
+      {/* Clic extérieur pour fermer le menu */}
+      {showActionsMenu && (
+        <div 
+          className="fixed inset-0 z-0" 
+          onClick={() => setShowActionsMenu(false)}
+        ></div>
+      )}
 
       <div className="mt-4">
         <Link

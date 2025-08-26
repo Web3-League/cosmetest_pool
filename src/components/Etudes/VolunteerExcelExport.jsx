@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import volontaireService from '../../services/volontaireService';
-import etudeService from '../../services/etudeService'; // Ajout du service étude
+import etudeService from '../../services/etudeService';
 
 
 const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = null }) => {
@@ -31,6 +31,68 @@ const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = nu
       console.error('Erreur formatage ethnie:', error);
       return '';
     }
+  };
+
+  // Fonction pour normaliser les types de peau (regrouper les variations)
+  const normalizeTypePeau = (typePeau) => {
+    if (!typePeau) return 'Non spécifié';
+    
+    const normalized = typePeau.trim();
+    
+    // Normaliser les variations de casse et d'orthographe
+    const normalizations = {
+      'sensible': 'Sensible',
+      'Sensible': 'Sensible',
+      'SENSIBLE': 'Sensible',
+      'grasse': 'Grasse',
+      'Grasse': 'Grasse',
+      'GRASSE': 'Grasse',
+      'sèche': 'Sèche', 
+      'Sèche': 'Sèche',
+      'seche': 'Sèche',
+      'Seche': 'Sèche',
+      'SÈCHE': 'Sèche',
+      'normale': 'Normale',
+      'Normale': 'Normale',
+      'NORMALE': 'Normale',
+      'mixte': 'Mixte',
+      'Mixte': 'Mixte',
+      'MIXTE': 'Mixte',
+      'mixte à tendance grasse': 'Mixte à tendance grasse',
+      'Mixte à tendance grasse': 'Mixte à tendance grasse',
+      'mixte à tendance sèche': 'Mixte à tendance sèche',
+      'Mixte à tendance sèche': 'Mixte à tendance sèche',
+      'mixte à tendance seche': 'Mixte à tendance sèche',
+      'Mixte à tendance seche': 'Mixte à tendance sèche'
+    };
+
+    return normalizations[normalized] || normalized;
+  };
+
+  // Fonction pour normaliser la sensibilité cutanée
+  const normalizeSensibiliteCutanee = (sensibilite) => {
+    if (!sensibilite) return 'Non spécifié';
+    
+    const normalized = sensibilite.trim();
+    
+    // Normaliser les variations de casse pour la sensibilité cutanée
+    const normalizations = {
+      'peau sensible': 'Peau sensible',
+      'Peau sensible': 'Peau sensible',
+      'Peau Sensible': 'Peau sensible',
+      'PEAU SENSIBLE': 'Peau sensible',
+      'peau non sensible': 'Peau non sensible',
+      'Peau non sensible': 'Peau non sensible',
+      'Peau Non Sensible': 'Peau non sensible',
+      'PEAU NON SENSIBLE': 'Peau non sensible',
+      'sensible': 'Peau sensible',
+      'Sensible': 'Peau sensible',
+      'non sensible': 'Peau non sensible',
+      'Non sensible': 'Peau non sensible',
+      'Non Sensible': 'Peau non sensible'
+    };
+
+    return normalizations[normalized] || normalized;
   };
 
   const exportVolunteersToExcel = async () => {
@@ -78,14 +140,19 @@ const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = nu
 
       const volunteerResults = await Promise.all(volunteerPromises);
 
-      // Filtrer les résultats valides
+      // Filtrer les résultats valides et normaliser les types de peau
       volunteerResults.forEach(result => {
         if (result.data) {
-          volunteersData.push({
+          const normalizedData = {
             ...result.data,
             numeroSujet: result.index,
-            idVolontaire: result.id
-          });
+            idVolontaire: result.id,
+            // Normaliser le type de peau
+            typePeauVisage: normalizeTypePeau(result.data.typePeauVisage),
+            // Normaliser la sensibilité cutanée
+            sensibiliteCutanee: normalizeSensibiliteCutanee(result.data.sensibiliteCutanee)
+          };
+          volunteersData.push(normalizedData);
         }
       });
 
@@ -157,7 +224,7 @@ const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = nu
         // Sensibilité cutanée (utilise l'attribut sensibiliteCutanee de l'entité)
         row.push(volunteer.sensibiliteCutanee || '');
 
-        // Type de peau (utilise typePeauVisage)
+        // Type de peau (utilise typePeauVisage normalisé)
         row.push(volunteer.typePeauVisage || '');
 
         // D0 (Date de début d'étude en anglais)
@@ -283,6 +350,7 @@ const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = nu
       });
 
       // === 3. STATISTIQUES DE TYPES DE PEAU (FORMAT PIVOT) ===
+      // Utiliser les données déjà normalisées
       const typesPeauStats = volunteersData.reduce((acc, v) => {
         const type = v.typePeauVisage || 'Non spécifié';
         acc[type] = (acc[type] || 0) + 1;
@@ -294,21 +362,40 @@ const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = nu
         ['', '', ''] // Séparateur
       ];
 
-      //afficher tjrs dans le meme ordre:
+      // Afficher toujours dans le même ordre:
       const orderedTypesPeau = [
         'Grasse',
         'Mixte',
         'Normale',
         'Sèche',
+        'Sensible', // Une seule entrée pour "Sensible"
         'Mixte à tendance grasse',
         'Mixte à tendance sèche'
       ];
 
       orderedTypesPeau.forEach(type => {
         const count = typesPeauStats[type] || 0;
-        const percentage = Math.round((count / volunteersData.length) * 100 * 10) / 10;
-        typesPeauPivot.push([type, count, `${percentage}%`]);
+        if (count > 0) { // Afficher seulement si il y a des données
+          const percentage = Math.round((count / volunteersData.length) * 100 * 10) / 10;
+          typesPeauPivot.push([type, count, `${percentage}%`]);
+        }
       });
+
+      // Ajouter les types non prévus dans l'ordre (s'il y en a)
+      Object.entries(typesPeauStats).forEach(([type, count]) => {
+        if (!orderedTypesPeau.includes(type) && type !== 'Non spécifié') {
+          const percentage = Math.round((count / volunteersData.length) * 100 * 10) / 10;
+          typesPeauPivot.push([type, count, `${percentage}%`]);
+        }
+      });
+
+      // Ajouter "Non spécifié" à la fin s'il existe
+      if (typesPeauStats['Non spécifié']) {
+        const count = typesPeauStats['Non spécifié'];
+        const percentage = Math.round((count / volunteersData.length) * 100 * 10) / 10;
+        typesPeauPivot.push(['Non spécifié', count, `${percentage}%`]);
+      }
+
       typesPeauPivot.push(['', '', '']);
 
       // Ligne vide pour séparer les sections
@@ -606,6 +693,7 @@ const VolunteerExcelExport = ({ volunteerIds = [], studyId = null, studyRef = nu
       console.log(`- Age: moyenne=${moyenneAge} ans, médiane=${medianeAge} ans, écart-type=${ecartTypeAge} ans`);
       console.log(`- Age: min=${minAge} ans, max=${maxAge} ans`);
       console.log(`- Sensibilité cutanée:`, sensibiliteStats);
+      console.log(`- Types de peau normalisés:`, typesPeauStats);
       console.log(`- Phototypes:`, phototypesStats);
       console.log(`- Ethnies:`, ethniesStats);
       console.log('=== FORMAT PIVOT UTILISÉ ===');

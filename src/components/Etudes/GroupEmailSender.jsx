@@ -28,6 +28,8 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
             const volunteerResponse = await api.get(`/volontaires/${assoc.idVolontaire}`);
             return {
               ...volunteerResponse.data,
+              // Convertir l'ID en string pour assurer la cohérence
+              idVolontaire: String(volunteerResponse.data.idVolontaire || assoc.idVolontaire),
               numsujet: assoc.numsujet,
               statut: assoc.statut
             };
@@ -44,8 +46,8 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
 
         setVolunteers(validVolunteers);
         
-        // Sélectionner tous les volontaires par défaut
-        setSelectedVolunteers(new Set(validVolunteers.map(v => v.idVolontaire)));
+        // Sélectionner tous les volontaires par défaut - convertir les IDs en string
+        setSelectedVolunteers(new Set(validVolunteers.map(v => String(v.idVolontaire))));
 
         // Initialiser le sujet avec la référence de l'étude
         setEmailData(prev => ({
@@ -67,13 +69,18 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
   }, [studyId, studyRef, studyTitle]);
 
   const handleVolunteerToggle = (volunteerId) => {
+    // S'assurer que l'ID est une string pour la cohérence
+    const volunteerIdStr = String(volunteerId);
+    
     setSelectedVolunteers(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(volunteerId)) {
-        newSet.delete(volunteerId);
+      if (newSet.has(volunteerIdStr)) {
+        newSet.delete(volunteerIdStr);
       } else {
-        newSet.add(volunteerId);
+        newSet.add(volunteerIdStr);
       }
+      // Log pour débogage - vous pouvez le retirer une fois que ça marche
+      console.log('Toggle volunteer:', volunteerIdStr, 'New set size:', newSet.size);
       return newSet;
     });
   };
@@ -82,7 +89,7 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
     if (selectedVolunteers.size === volunteers.length) {
       setSelectedVolunteers(new Set());
     } else {
-      setSelectedVolunteers(new Set(volunteers.map(v => v.idVolontaire)));
+      setSelectedVolunteers(new Set(volunteers.map(v => String(v.idVolontaire))));
     }
   };
 
@@ -95,7 +102,9 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
   };
 
   const generateMailtoLink = () => {
-    const selectedVolunteerData = volunteers.filter(v => selectedVolunteers.has(v.idVolontaire));
+    const selectedVolunteerData = volunteers.filter(v => 
+      selectedVolunteers.has(String(v.idVolontaire))
+    );
     
     if (selectedVolunteerData.length === 0) {
       setError('Veuillez sélectionner au moins un volontaire.');
@@ -137,7 +146,7 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
 
   const getSelectedEmails = () => {
     return volunteers
-      .filter(v => selectedVolunteers.has(v.idVolontaire))
+      .filter(v => selectedVolunteers.has(String(v.idVolontaire)))
       .map(v => v.email)
       .join('; ');
   };
@@ -236,7 +245,7 @@ const GroupEmailSender = ({ studyId, studyRef, studyTitle, onClose }) => {
                   <label key={volunteer.idVolontaire} className="flex items-center">
                     <input
                       type="checkbox"
-                      checked={selectedVolunteers.has(volunteer.idVolontaire)}
+                      checked={selectedVolunteers.has(String(volunteer.idVolontaire))}
                       onChange={() => handleVolunteerToggle(volunteer.idVolontaire)}
                       className="form-checkbox h-4 w-4 text-primary-600"
                     />

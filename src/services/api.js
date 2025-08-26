@@ -56,8 +56,6 @@ api.interceptors.response.use(
       
       if (!isAuthPath) {
         console.log('Redirection vers la page de connexion suite à une erreur d\'authentification');
-        // Utiliser history.push au lieu de window.location pour éviter le rechargement complet
-        // Si vous utilisez React Router v6
         window.location.href = '/cosmetest/login';
       }
     }
