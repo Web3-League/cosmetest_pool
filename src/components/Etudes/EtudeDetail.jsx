@@ -9,7 +9,7 @@ import VolunteerExcelExport from './VolunteerExcelExport'
 import RdvExcelExport from './RdvExcelExport'
 import AppointmentViewer from '../RendezVous/AppointmentViewer'
 import GroupEmailSender from './GroupEmailSender'
-import IndemniteManager from './IndemniteManager.jsx' // Import du nouveau composant
+import IndemniteManager from './IndemniteManager.jsx'
 
 const EtudeDetail = () => {
   const { id } = useParams()

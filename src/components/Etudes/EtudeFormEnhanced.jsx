@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import etudeService from "../../services/etudeService";
-import IndemniteManager from "./IndemniteManager.jsx"; // Import du nouveau composant
+import IndemniteManager from "./IndemniteManager.jsx";
 
 const EtudeFormEnhanced = () => {
   const { id } = useParams();

@@ -311,22 +311,11 @@ const IndemniteManager = ({
   const [debugInfo, setDebugInfo] = useState("");
 
   // Hooks personnalisés
-  const { groupesInfo, volontairesInfo, loadGroupesInfo, loadVolontairesInfo } =
+  const { volontairesInfo, loadGroupesInfo, loadVolontairesInfo } =
     useEntitiesInfo();
 
   const { updateStatus, updateStatut, updateNumSujet, updateIV } =
     useVolontaireUpdates(etudeId, setVolontairesAssignes, setError, setDebugInfo);
-
-  // Fonctions utilitaires memoizées
-  const getGroupeName = useMemo(
-    () => (idGroupe) => {
-      if (!idGroupe || idGroupe === 0) return "Aucun groupe";
-      const groupe = groupesInfo[idGroupe];
-      if (!groupe) return `Groupe #${idGroupe}`;
-      return groupe.intitule || groupe.nom || `Groupe #${idGroupe}`;
-    },
-    [groupesInfo]
-  );
 
   const getVolontaireName = useMemo(
     () => (idVolontaire) => {
