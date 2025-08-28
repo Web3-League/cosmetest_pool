@@ -9,7 +9,7 @@ import VolunteerExcelExport from './VolunteerExcelExport'
 import RdvExcelExport from './RdvExcelExport'
 import AppointmentViewer from '../RendezVous/AppointmentViewer'
 import GroupEmailSender from './GroupEmailSender'
-
+import IndemniteManager from './IndemniteManager.jsx' // Import du nouveau composant
 
 const EtudeDetail = () => {
   const { id } = useParams()
@@ -25,7 +25,7 @@ const EtudeDetail = () => {
   const [activeTab, setActiveTab] = useState('details')
   const [infosVolontaires, setInfosVolontaires] = useState({})
 
-  // ✅ États pour l'affichage du RDV
+  // États pour l'affichage du RDV
   const [selectedRdv, setSelectedRdv] = useState(null)
   const [showRdvViewer, setShowRdvViewer] = useState(false)
 
@@ -33,13 +33,13 @@ const EtudeDetail = () => {
   const [sortField, setSortField] = useState('date')
   const [sortDirection, setSortDirection] = useState('asc')
 
-  // ✅États pour l'affichage du sendEmail
+  // États pour l'affichage du sendEmail
   const [showEmailSender, setShowEmailSender] = useState(false)
 
   // État pour le menu dropdown des actions
   const [showActionsMenu, setShowActionsMenu] = useState(false)
 
-  // ✅ États pour la gestion des groupes
+  // États pour la gestion des groupes
   const [showGroupeForm, setShowGroupeForm] = useState(false)
   const [newGroupe, setNewGroupe] = useState({
     intitule: '',
@@ -110,7 +110,7 @@ const EtudeDetail = () => {
     }
   }, [id, activeTab])
 
-  // ✅ Gestionnaire de clic sur un RDV
+  // Gestionnaire de clic sur un RDV
   const handleRdvClick = (rdv) => {
     // Normaliser les données du RDV pour AppointmentViewer
     const normalizedRdv = {
@@ -128,13 +128,13 @@ const EtudeDetail = () => {
     setShowRdvViewer(true)
   }
 
-  // ✅ Retour à la liste des RDVs
+  // Retour à la liste des RDVs
   const handleBackToRdvList = () => {
     setShowRdvViewer(false)
     setSelectedRdv(null)
   }
 
-  // ✅ Rafraîchir les données après modification
+  // Rafraîchir les données après modification
   const handleRdvUpdate = () => {
     // Recharger les RDVs
     const fetchRdvs = async () => {
@@ -151,6 +151,11 @@ const EtudeDetail = () => {
     setShowRdvViewer(false)
     setSelectedRdv(null)
   }
+
+  // Gestionnaire d'erreur pour le composant IndemniteManager
+  const handleIndemniteError = useCallback((errorMessage) => {
+    setError(errorMessage)
+  }, [])
 
   const getUniqueVolunteerIds = () => {
     return [...new Set(
@@ -430,6 +435,12 @@ const EtudeDetail = () => {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
         {error}
+        <button
+          onClick={() => setError(null)}
+          className="absolute top-0 right-0 mt-2 mr-2 text-red-500 hover:text-red-700"
+        >
+          ×
+        </button>
       </div>
     )
   }
@@ -495,6 +506,15 @@ const EtudeDetail = () => {
             >
               Groupes
             </button>
+            <button
+              className={`py-4 px-6 border-b-2 font-medium text-sm ${activeTab === 'indemnites'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              onClick={() => setActiveTab('indemnites')}
+            >
+              Indemnités
+            </button>
           </nav>
         </div>
 
@@ -519,7 +539,7 @@ const EtudeDetail = () => {
 
               <div className="md:col-span-2">
                 <span className="text-xs uppercase text-gray-500">Description</span>
-                <p className="mt-1 whitespace-pre-line">{etude.description || 'Aucune description'}</p>
+                <p className="mt-1 whitespace-pre-line">{etude.description || etude.commentaires || 'Aucune description'}</p>
               </div>
 
               <div className="md:col-span-2">
@@ -561,6 +581,17 @@ const EtudeDetail = () => {
                 </p>
               </div>
             </div>
+          )}
+
+          {/* NOUVEL ONGLET INDEMNITÉS */}
+          {activeTab === 'indemnites' && (
+            <IndemniteManager
+              etudeId={id}
+              etudeTitre={etude.titre}
+              etudeRef={etude.ref}
+              onError={handleIndemniteError}
+              showDebugInfo={false}
+            />
           )}
 
           {activeTab === 'groupes' && (
@@ -829,7 +860,7 @@ const EtudeDetail = () => {
 
           {activeTab === 'rdvs' && (
             <div>
-              {/* ✅ Afficher le composant d'envoi d'email si activé */}
+              {/* Afficher le composant d'envoi d'email si activé */}
               {showEmailSender ? (
                 <GroupEmailSender
                   studyId={etude.idEtude}
@@ -861,7 +892,7 @@ const EtudeDetail = () => {
                 </div>
               ) : (
                 <div>
-                  {/* 🎨 En-tête amélioré avec actions regroupées */}
+                  {/* En-tête amélioré avec actions regroupées */}
                   <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 space-y-4 lg:space-y-0">
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">Rendez-vous</h3>
@@ -1039,7 +1070,7 @@ const EtudeDetail = () => {
                     <div>
                       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-sm text-blue-800">
-                          💡 <strong>Astuce :</strong> Cliquez sur n'importe quelle ligne pour voir les détails du rendez-vous et le modifier.
+                          <strong>Astuce :</strong> Cliquez sur n'importe quelle ligne pour voir les détails du rendez-vous et le modifier.
                         </p>
                       </div>
                       <div className="overflow-x-auto">
@@ -1142,7 +1173,7 @@ const EtudeDetail = () => {
           to="/etudes"
           className="text-primary-600 hover:text-primary-800"
         >
-          &larr; Retour à la liste des études
+          ← Retour à la liste des études
         </Link>
       </div>
     </div>

@@ -11,7 +11,7 @@ const api = axios.create({
 // Intercepteur pour ajouter le token d'authentification à chaque requête
 api.interceptors.request.use(
   (config) => {
-    const token = Cookies.get('token')
+    const token = Cookies.get('jwt')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -26,7 +26,7 @@ api.interceptors.response.use(
   (error) => {
     // Si l'erreur est 401 (Unauthorized), rediriger vers la page de connexion
     if (error.response && error.response.status === 401) {
-      Cookies.remove('token')
+      Cookies.remove('jwt')
       Cookies.remove('user')
       window.location.href = '/login'
     }

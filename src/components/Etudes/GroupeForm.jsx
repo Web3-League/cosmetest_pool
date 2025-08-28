@@ -42,12 +42,15 @@ const GroupeForm = () => {
 
   // 1. Fonctions utilitaires pour la conversion
   const ethniesArrayToString = (ethniesArray) => {
-    return Array.isArray(ethniesArray) ? ethniesArray.join(',') : ''
+    return Array.isArray(ethniesArray) ? ethniesArray.join(';') : ''
   }
 
   const ethniesStringToArray = (ethniesString) => {
     if (!ethniesString || ethniesString === '') return []
-    return ethniesString.split(',').filter(e => e.trim() !== '')
+
+    // Supporte à la fois la virgule et le point-virgule
+    const separator = ethniesString.includes(';') ? ';' : ','
+    return ethniesString.split(separator).filter(e => e.trim() !== '')
   }
 
   // Charger le groupe si on est en mode édition
@@ -286,7 +289,8 @@ const GroupeForm = () => {
               <label key={ethnieOption} className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={Array.isArray(groupe.ethnie) && groupe.ethnie.includes(ethnieOption)}
+                  checked={Array.isArray(groupe.ethnie) &&
+                    groupe.ethnie.some(e => e.toLowerCase() === ethnieOption.toLowerCase())}
                   onChange={() => handleEthnieChange(ethnieOption)}
                   className="form-checkbox h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
